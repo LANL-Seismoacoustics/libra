@@ -5,6 +5,8 @@
 ## About _Libra.Client_
 The _Client_ class was added to `Libra` to provide an easier method of instantiating `SQLAlchemy` _Session_ objects. The _Session_ object establishes and contains all interactions with a database connection (Read more here: [Session Basics](https://docs.sqlalchemy.org/en/20/orm/session_basics.html)). _Libra.Client_ acts as a wrapper around the _Session_ object, and simply extends the support of database connection instantiation. Support for connection methods include the typical methods used by the _Session_ object in `SQLAlchemy`, as well as some new methods like configuration file parsing and explicit declaration of connection string variables. This document is intended to demonstrate all supported methods of instantiating the _Libra.Client_ object.
 
+__Note__: '_session_' is an attribute of the _Client_ class and is initialized in the _Client.\__init\__()_ method. The `SQLAlchemy` _Session_ object is mapped to this _Client.session_ attribute, and can be called directly from the _Client.\__call\__()_ method, and can be invoked by simply calling _Client()_ (emphasis on the parentheses following _Client_)
+
 ## Examples
 
 ### Connect using a correctly-formatted connection string
