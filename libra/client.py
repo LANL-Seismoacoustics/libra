@@ -6,7 +6,6 @@ from typing import TypedDict, Unpack
 from typing import Optional, Union
 
 from sqlalchemy.orm import Session
-import pdb
 
 # ==============================================================================
 
@@ -18,7 +17,7 @@ class Client_Connect_Strategy(ABC):
 
     @abstractmethod
     def connect(self) -> Session:
-        pass
+        """Establish a database session"""
 
 # ==============================================================================
 
@@ -298,7 +297,7 @@ class Client:
 
         Parameters
         ----------
-        **kwargs : dict, optional
+        **kwargs
             See ClientParams Typed Dictionary for a description of all accepted
             keyword parameters for the Client.__init__() method.
         

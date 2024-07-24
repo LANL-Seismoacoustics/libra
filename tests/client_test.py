@@ -1,9 +1,7 @@
-import os
 import unittest
 from typing import Dict
 
 from sqlalchemy.orm import Session
-import pdb
 
 from libra import Client
 from libra import Client_Connect_Strategy
