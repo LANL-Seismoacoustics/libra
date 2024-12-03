@@ -1,1 +1,6 @@
+__pycache__
+*.cnf
 *.pyc
+.gitignore
+.legacy
+.git*
