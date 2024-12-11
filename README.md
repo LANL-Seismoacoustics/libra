@@ -12,6 +12,8 @@
 ## About _Libra_
 `Libra` is a database management package built on [`SQLAlchemy`](https://www.sqlalchemy.org/) to easily and dynamically connect your relational SQL database to the object-oriented Python development environment. Developed by Brady Spears at Los Alamos National Laboratory (LANL), `Libra` absorbs much of the boilerplate code and developer overhead in creating and defining `SQLAlchemy` object-relation mapped (ORM) instances. `Libra` is maintained and developed under the LANL Seismoacoustic Team's Python Geophysical Suite (PyGS). 
 
+### <ins>Libra is still in development - come back regularly for updates!</ins>
+
 ## Features
 `Libra` extends `SQLAlchemy's` ORM to support:
 - An extension of the **sqlalchemy.orm.Session** class to allow more connection methods, including instantiation of a database connection via environment variables or config files.
@@ -23,4 +25,3 @@
     - Column- and table-specific data quality control methods
 - Flexibility to derive ORM instance methods from the provided metaclass or a custom metaclass implementation.
 - Flexibility to design, define, and digest your schema in a way that makes sense for your needs.
-
