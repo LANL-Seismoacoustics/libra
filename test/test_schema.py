@@ -1,4 +1,5 @@
 import unittest
+import datetime
 
 from sqlalchemy import Column
 from sqlalchemy import DateTime, Float, Integer, String
@@ -12,14 +13,14 @@ from libra.util import ColumnHandler
 class SchemaInitializationTests(unittest.TestCase):
     """Testing Schema initialization method"""
 
-    def test_schema_init_simple(self) -> bool:
+    def test_schema_init_simple(self) -> None:
         """Test creating an empty schema with a name"""
 
         schema = Schema('Test Schema')
 
         return self.assertEqual(schema.name, 'Test Schema')
 
-    def test_schema_init_with_custom_declarative_base(self) -> bool:
+    def test_schema_init_with_custom_declarative_base(self) -> None:
         """Test creating an empty schema with a non-default declarative base"""
 
         custom_base = declarative_base()
@@ -28,7 +29,7 @@ class SchemaInitializationTests(unittest.TestCase):
 
         return self.assertEqual(schema.base, custom_base)
 
-    def test_schema_init_with_single_mixin(self) -> bool:
+    def test_schema_init_with_single_mixin(self) -> None:
         """Test creating an empty schema with one added mixin class"""
 
         class CustomMixin: ...
@@ -37,7 +38,7 @@ class SchemaInitializationTests(unittest.TestCase):
 
         return self.assertEqual(schema.mixins[0].__name__, 'CustomMixin')
 
-    def test_schema_init_with_multiple_mixin(self) -> bool:
+    def test_schema_init_with_multiple_mixin(self) -> None:
         """Test creating an empty schema with one added mixin class"""
 
         class CustomMixin1: ...
@@ -50,7 +51,7 @@ class SchemaInitializationTests(unittest.TestCase):
 
         return self.assertEqual(mixin_test, mixin_true)
 
-    def test_schema_init_with_nondefault_colhandler(self) -> bool:
+    def test_schema_init_with_nondefault_colhandler(self) -> None:
         """Test creating empty schema with custom ColumnHandler"""
 
         class CustomColumnHandler(ColumnHandler):
@@ -62,7 +63,7 @@ class SchemaInitializationTests(unittest.TestCase):
 
         return self.assertEqual(schema.columnhandler.__name__, 'CustomColumnHandler')
     
-    def test_schema_init_with_different_typemap(self) -> bool:
+    def test_schema_init_with_different_typemap(self) -> None:
         """Test to ensure type_map is passed to ColumnHandler object correctly"""
         from sqlalchemy import String, VARCHAR
 
@@ -72,7 +73,7 @@ class SchemaInitializationTests(unittest.TestCase):
 
         return self.assertEqual(schema.columnhandler.type_map, type_map)
 
-    def test_schema_init_nondefault_colhandler_w_custom_type_map(self) -> bool:
+    def test_schema_init_nondefault_colhandler_w_custom_type_map(self) -> None:
         """Test to ensure a nondefault type_map can be included with a custom ColumnHandler object"""
         from sqlalchemy import Float, FLOAT
 
@@ -92,7 +93,7 @@ class SchemaInitializationTests(unittest.TestCase):
 class SchemaRepresentationTests(unittest.TestCase):
     """Testing the Schema representation method"""
 
-    def test_schem_repr(self) -> bool:
+    def test_schem_repr(self) -> None:
         """Test Schema.__repr__() method"""
 
         schema = Schema('My Schema')
@@ -104,7 +105,7 @@ class SchemaRepresentationTests(unittest.TestCase):
 class SchemaAddModelTests(unittest.TestCase):
     """Testing the Schema add_model() method"""
 
-    def test_schema_add_model_1(self) -> bool:
+    def test_schema_add_model_1(self) -> None:
         """Model defined with 'pk' field defined only"""
 
         schema = Schema('Test') # Empty Schema object
@@ -114,10 +115,28 @@ class SchemaAddModelTests(unittest.TestCase):
             column1 = Column(Integer, autoincrement = True)
             column2 = Column(String, nullable = False)
             column3 = Column(Float, default = 1.0)
-            column4 = Column(DateTime)
+            column4 = Column(DateTime, default = datetime.datetime.now())
 
             pk = {'columns' : ['column1', 'column2'], 'name' : 'test_class_pk'}
+        
+        class Test(schema.Test_Class): 
+            __tablename__ = 'Test'
 
+        t = Test(
+            column1 = 1, 
+            column2 = 'testing', 
+            column4 = datetime.datetime(1970, 1, 1, 0, 0, 0)
+        )
+        
+        test_bool = [
+            t.column1 == 1,
+            t.column2 == 'testing',
+            t.column3.arg == 1.0,
+            t.column4 == datetime.datetime(1970, 1, 1, 0, 0, 0)
+        ]
+        
+        return self.assertTrue(all(test_bool))
+    
 # ==============================================================================
 
 if __name__ == '__main__':

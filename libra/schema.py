@@ -9,20 +9,18 @@ from typing import TypedDict, Unpack
 from typing import Any, Callable,Dict, List
 from typing import Callable, Optional, Self, Tuple, Type, Union
 
-import pdb
 from sqlalchemy import (
     CheckConstraint,
     ForeignKeyConstraint,
     PrimaryKeyConstraint, 
     UniqueConstraint
 )
-from sqlalchemy.orm import Session as _Session
+from sqlalchemy.orm import Session
 from sqlalchemy.orm import DeclarativeMeta, declarative_base
 from sqlalchemy.ext.declarative import declared_attr
 
-from .session import Session
 from .metaclass import LibraMetaClass
-from .util.typing import _Mixin, _SQLType, _PreprocessedORM
+from .util.typing import _Mixin, _SQLType, _PreprocessedORM, _ProcessedORM
 from .util.typing import SchemaLoadParams, SchemaWriteParams
 from .util import ColumnHandler, Default_ColumnHandler
 from .util import SchemaTransferStrategy
@@ -230,51 +228,19 @@ class Schema:
         >>>     user_created : Column(DateTime)
         """
 
+        # TODO: type[DeclarativeMeta] is not proper output should be type[sqlalchemy.]
         def wrap(_cls : _PreprocessedORM) -> type[DeclarativeMeta]:
-            return self._process_orm(_cls)
+            return process_model(_cls, self.base, self.mixins)
         
         if cls is None:
             return wrap
         
         setattr(self, cls.__name__, wrap(cls))
 
-    def _process_orm(self, cls : _PreprocessedORM) -> type[DeclarativeMeta]:
-        """Processes an arbitrary class defining the structure of an abstract 
-        ORM (or SQL table), and returns the abstract ORM as a child of the 
-        appropriate DeclarativeMeta and Mixin classes, while properly defining 
-        primary keys, unique constraints, and foreign keys.
-
-        Parameters
-        ----------
-        cls : object
-            Properly-formatted arbitrary class defining the structure of a 
-            desired abstract ORM instance. Will be recast to the output object 
-            as a subclass of self.base and self.mixins.
-        """
-
-        all_constraints = {
-            'cc' : CheckConstraint,
-            'fk' : ForeignKeyConstraint,
-            'pk' : PrimaryKeyConstraint, 
-            'uc' : UniqueConstraint
-        }
-
-        orm_constraint = []
-        for k, v in all_constraints.items():
-            _con = cls.__dict__.get(k, None)
-            if _con is not None:
-                delattr(cls, k)
-                _args = _con['columns']; del _con['columns']
-                orm_constraint.append(all_constraints[k](*_args, **_con))
-
-        __table_args__ = tuple(orm_constraint)
-        
-        _cls = type(cls.__name__, (self.base, *self.mixins, ),
-            {'__abstract__' : True, '__table_args__' : __table_args__,
-             **{col : val for col, val in cls.__dict__.items() if col != '__dict__'}})
-        
-        return _cls
-
+    def remove_model(self, model : str) -> None:
+        """TODO: Remove a model from the schema"""
+        return NotImplementedError
+    
     @staticmethod
     def _direct_params(**kwargs : Unpack[SchemaLoadParams | Unpack[SchemaWriteParams]]) -> type[SchemaTransferStrategy]:
         """Returns the appropriate SchemaTransferStrategy subclass based on the 
@@ -319,8 +285,8 @@ class Schema:
             return SchemaTransferDB
         
         if kwargs.get('file'):
-            if pathlib.Path(kwargs['file']).suffix == '.yml':
-                return SchemaTransferStrategy
+            if pathlib.Path(kwargs['file']).suffix == '.yaml':
+                return SchemaTransferYAML
         
         if kwargs.get('schema_dict'):
             return SchemaTransferDict
@@ -328,3 +294,80 @@ class Schema:
         raise NotImplementedError('Schema transfer method not supported.')
 
 # ==============================================================================
+
+def process_model(cls : _PreprocessedORM,
+        base : type[DeclarativeMeta] | None = None, #TODO: Not of type[DeclarativeMeta]
+        mixins : tuple[type[_Mixin]] | None = None
+        ) -> _ProcessedORM:
+    """Processes an arbitrary class defining the structure of an abstract ORM 
+    (AKA an SQL table without a concrete tablename), and returns the abstract 
+    ORM as the child of the appropriate DeclarativeMeta superclass and any 
+    declared Mixin classes. Primary keys, unique constraints, and foreign keys 
+    are also cast properly here. 
+
+    Parameters
+    ----------
+    cls : object
+        Properly-fromatted arbitrary class defining the structure of a 
+        desired abstract ORM instance. Will be recast to the output object 
+        as a subclass inheriting primarily from input base and secondarily 
+        from input mixins.
+    base : object
+        Metaclass inheriting from DeclarativeMeta. Input cls will be re-cast as 
+        a new object inheriting from base.
+    mixins : tuple
+        Tuple containing mixin classes. Input cls, re-cast using input base, 
+        will secondarily inherit from all classes contained in this mixins 
+        input.
+    
+    Returns
+    -------
+    object
+        Class re-cast to inherit from input base and mixin classes with primary 
+        keys, unique keys, and foreign keys cast to the SQLAlchemy ORM model 
+        properly.
+    
+    Examples
+    --------
+    #TODO: Provide Examples
+    """
+
+    if not base:
+        base = declarative_base(metaclass = LibraMetaClass)
+
+    if not mixins:
+        mixins = ()
+
+    parents = (base, *mixins, )
+
+    all_constraints = {
+        'cc' : CheckConstraint,
+        'fk' : ForeignKeyConstraint,
+        'pk' : PrimaryKeyConstraint,
+        'uc' : UniqueConstraint
+    }
+
+    orm_constraint = []
+    for k in all_constraints.keys():
+        _con = cls.__dict__.get(k, None)
+        if _con:
+            if type(_con) == dict:
+                _args = _con['columns']; del _con['columns']
+            elif type(_con) == list:
+                _args = _con; _con = {}
+            orm_constraint.append(all_constraints[k](*_args, **_con))
+            delattr(cls, k)
+    
+    __table_args__ = tuple(orm_constraint)
+    
+    _cls = type(
+        cls.__name__, 
+        parents,
+        {
+            '__abstract__' : True, 
+            '__table_args__' : __table_args__,
+            **{col : val for col, val in cls.__dict__.items() if col != '__dict__'}
+        }
+    )
+
+    return _cls

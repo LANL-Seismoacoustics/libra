@@ -152,6 +152,13 @@ def _update_docstring(cls) -> str:
 
     return NotImplementedError
 
+def _to_dict(cls):
+    _dict = {}
+    for col in cls.__mapper__.columns:
+        _dict[col.name] = cls[col.name]
+    
+    return _dict
+
 # ==============================================================================
 
 class LibraMetaClass(DeclarativeMeta):
@@ -171,6 +178,7 @@ class LibraMetaClass(DeclarativeMeta):
         dct['__setitem__'] = _setitem
         dct['__len__']     = _len
         dct['__eq__']      = _eq
+        dct['to_dict']     = _to_dict
         # Equal methods that compare on unique keys & all columns would be useful
 
         dct['_col_registry'] = {}

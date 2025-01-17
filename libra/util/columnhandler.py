@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+import importlib
 from typing import Any, Dict
 from typing import Optional, Type
 
@@ -43,7 +44,7 @@ class ColumnHandler(ABC):
         return {}
     
     @abstractmethod
-    def construct(self, name : str, coldef : Dict[str, Any], type_key : str = 'type') -> Column:
+    def construct(self, name : str, coldef : Dict[str, Any], type_key : str = 'data_type') -> Column:
         """Constructs sqlalchemy.Column from text-based description"""
 
     @abstractmethod
@@ -59,10 +60,10 @@ class Default_ColumnHandler(ColumnHandler):
 
     type_map = {}
     info_keys : list[str] = [
-        'regex', 'min', 'max', 'description', 'format'
+        'description', 'author'
     ]
     
-    def construct(self, name : str, coldef : Dict[str, Any], type_key : str = 'type') -> Column:
+    def construct(self, name : str, coldef : Dict[str, Any], type_key : str = 'data_type') -> Column:
         """
         Constructs an SQLAlchemy Column object from a provided column definition
         dictionary. All key-value pairs in coldef are passed onto the 
@@ -87,11 +88,11 @@ class Default_ColumnHandler(ColumnHandler):
 
         kwargs, info = {}, {}
         for key, value in coldef.items():
+
+            # Handle data typing
             if key == type_key:
-                _type = self.type_map.get(value.__class__, value)
-                if _type != value:
-                    _type = _type(**value.__dict__)
-            
+                _type = self.cast_type(value)
+                
             if key in self.info_keys:
                 info.update({key : value})
             else:
@@ -102,5 +103,35 @@ class Default_ColumnHandler(ColumnHandler):
 
     def deconstruct(self):
         return NotImplementedError
+    
+    def cast_type(self, _t : str | type[_SQLType]) -> _SQLType:
+
+        # This function is going to get insane.
+        if type(_t) == str:
+            args, kwargs = [], {}
+            if '(' in _t and ')' in _t and (_t.index('(') + 1 != _t.index(')')):
+                left, right = _t.index('('), _t.index(')')
+                inputs = [i.replace(' ', '') for i in _t[left + 1:right].split(',')]
+                _type_call = _t[0:left]
+                for param in inputs:
+                    if '=' in param:
+                        key, value = param.split('=')
+                        kwargs[key] = value
+                    else:
+                        args.append(param)
+            else:
+                _type_call = _t.replace('()', '')
+            
+            modules = ['sqlalchemy']
+            mod = importlib.import_module('sqlalchemy')
+
+            _type = getattr(mod, _type_call)(*args, **kwargs)
+        
+        else:
+            _type = self.type_map.get(_t.__class__, _t)
+            if _type != _t:
+                _type = _type(**_t.__dict__)
+        
+        return _type
     
 # ==============================================================================
