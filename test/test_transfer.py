@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import declarative_base
 
 from libra import Schema
-from test.resources.test_dict_decl import SCHEMA_TEST_DICTIONARY_1
+from .resources.test_dict_decl import SCHEMA_TEST_DICTIONARY_1
 
 # ==============================================================================
 # Dictionary Transfer Strategy
