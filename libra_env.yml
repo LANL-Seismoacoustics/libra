@@ -1,0 +1,11 @@
+name: libra-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip:
+    - cx-Oracle
+    - pydantic
+    - pydantic-settings
+    - pyyaml
+    - sqlalchemy>=2.0

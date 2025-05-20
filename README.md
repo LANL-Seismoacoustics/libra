@@ -1,54 +1,65 @@
-# _Libra_ - Dynamic Schema support in Python
+# _Libra_ - Your Database Manager's Favorite Database Manager
 
 > Brady Spears, Los Alamos National Laboratory
 
-![Libra Logo](/docs/pics/Libra_Logo.png)
+![Libra_Logo](/docs/pics/Libra_Logo.png)
 
 ## Table of Contents
-
--   [About _Libra_](#About-libra)
--   [Features](#Features)
--   [Depedencies](#Dependencies)
+- [About _Libra_](#About-Libra)
+- [Installation](#Installation)
+- [Examples](#Examples)
+- [References](#References)
 
 ## About _Libra_
-`Libra` is a database management package built on 
-[`SQLAlchemy`](https://www.sqlalchemy.org/) to easily and dynamically connect 
-your relational SQL database to the object-oriented Python development 
-environment. Developed by Brady Spears at Los Alamos National Laboratory (LANL), 
-`Libra` absorbs much of the boilerplate code and developer overhead in creating 
-and defining `SQLAlchemy` object-relation mapped (ORM) instances. `Libra` is 
-maintained and developed under the LANL Seismoacoustic Team's Python Geophysical 
-Suite (PyGS). 
+`Libra` is a database management package built on [`SQLAlchemy`](https://www.sqlalchemy.org/) 
+that allows you to easily and dynamically connect your relational database 
+structures to the object-oriented Python development environment. `Libra` was 
+conceptualized from the idea of the "schema-schema" (Carr et al., 2007), which 
+aimed at encoding descriptions of elements of a relational database schema into 
+database tables, allowing legacy software to dynamically construct SQL tables, 
+columns, and constraints programmatically on-the-fly. This concept has proved 
+particularly useful in data management practices that require data structures 
+emanating from different institutions, different formats, or even custom 
+augmentations of existing schemas.
 
-### <ins>Libra is still in development - come back regularly for updates!</ins>
+`Libra` encodes a subset of information needed to create abstract `SQLAlchemy` 
+object-relation-mapped (ORM) instances, hereafter referred to as "models," into 
+a variety of plain-text definition formats, including regular Python 
+dictionaries,YAML files, and a refined version of the "schema-schema." Using 
+`Libra`'s **Schema** object, building models boils down to a one-liner, with 
+optional support to customize the structure and behavior of your models both in 
+the object-oriented programming space and the relational database space.
 
-## Features
-`Libra` extends `SQLAlchemy's` ORM to support:
-- An extension of the **sqlalchemy.orm.Session** class to allow more connection 
-methods, including instantiation of a database connection via environment 
-variables or config files.
-- The loading/writing of database tables and columns from user-defined schema 
-to/from a variety of plain-text, built-in formats, as well as extendable 
-support for any other desired format.
-- Dynamic SQL datatype handling, where dialect-specific SQL datatypes can be 
-effectively mapped for the same schema on different database backends.
-- A plugin architecture connecting ORM models belonging to your schema to 
-custom-built functionality. Built-in plugins included with the `Libra` package 
-include:
-    - Flatfile read/write support
-    - Conversion of ORM instances to [`Pandas`](https://pandas.pydata.org/) 
-    **DataFrame** objects
-    - Column- and table-specific data quality control methods
-- Flexibility to derive ORM instance methods from the provided metaclass or a 
-custom metaclass implementation.
-- Flexibility to design, define, and digest your schema in a way that makes 
-sense for your needs.
+Support is also provided for reading/writing schemas to/from custom plain-text 
+formats and for augmenting model behavior through "mix-in" classes, which 
+introduce custom methods to all models deriving from a schema.
 
-## Dependencies
-### Required
-- [SQLAlchemy >= 2.0](https://www.sqlalchemy.org/)
+## Installation
+Requires:
+- [`SQLAlchemy`](https://www.sqlalchemy.org/) >= 2.0
+- [`Pydantic`](https://docs.pydantic.dev/latest/)
+- [`Pydantic-Settings`](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
 
-### Optional
-- [cx_Oracle](https://oracle.github.io/python-cx_Oracle/) (when working with 
-Oracle backends)
-- [Pandas](https://pandas.pydata.org/)
+## Examples
+Loading all "models" belonging to the **NNSA KB Core** schema and assiging 
+tablenames to them to then query using standard `SQLAlchemy` query syntax:
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from libra import Schema
+from libra import DatabaseSettings
+
+settings = DatabaseSettings(connection_str = 'sqlite:///kbcore_schema.db')
+
+kbcore = Schema('NNSA KB Core').load(settings)
+kbcore.assign_tablenames(prefix = 'new_')
+
+session = Session(create_engine(settings.connection_str))
+
+site_table_query = session.query(kbcore.site).all()
+```
+Executing this code will first construct all models belonging to the **NNSA KB Core** schema, a common schema used in the seismological sciences. Table names are assigned in the next step, structuring all models belonging to the **NNSA KB Core** schema with a prefix of "new_" (i.e. Models now become tables and are referred to by their tablenames, which resemble "new_site", "new_origin", etc.). The final few lines are concerned with setting up an `SQLAlchemy` **Session** and querying all rows of the "new_site" table in the relational database. 
+
+## References
+> Carr, D. B., Lewis, J. E., Ballard, S., Martinez, E. M., Hampton, J. W., Merchant, B. J., Stead, R. J., Crown, M., Roman-Nieves, J., & Dwyer, J. J. (2007). *Advances in the Integration of Large Data Sets for Seismic Monitoring of Nuclear Explosions.* Paper presnted at the 29th Monitoring Research Review: Ground-Based Nuclear Explosion Monitoring Technologies, Denver, CO.
