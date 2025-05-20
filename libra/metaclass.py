@@ -1,12 +1,25 @@
+"""
+Brady Spears
+5/5/25
+
+Contains the `MetaClass` object, which is a child of SQLAlchemy's 
+DeclarativeMeta class. The `MetaClass` object defines methods to operate on 
+any declarative base model inheriting from from `MetaClass`.
+"""
+
+# ==============================================================================
+
 from __future__ import annotations
 from typing import Any, List
-from typing import Optional, Self, Type, Union
+from typing import Optional, Self, Type, Union, Iterator
 
 import sqlalchemy
+from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeMeta, DeclarativeBase
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm.decl_base import _declarative_constructor
 from sqlalchemy.sql.schema import ScalarElementColumnDefault
+from sqlalchemy.sql.schema import CallableColumnDefault
 
 # ==============================================================================
 
@@ -66,17 +79,10 @@ def _str(self) -> str:
         if isinstance(val, ScalarElementColumnDefault):
             val = val.arg
         
-        # If _type_op is not standard (not <class int>, <class str>, etc.)
-        #  call the __str__ method belonging to that type 
-        #  an example is <class datetime.datetime>. Note: Will break if the 
-        #  passed _type_op does not have a __str__ method.
-        try:
-            if isinstance(val, str):
-                _string += f'{key} = \'{_type_op(val)}\''
-            else:
-                _string += f'{key} = {_type_op(val)}'
-        except TypeError:
-            _string += f'{key} = \'{str(val)}\''
+        if isinstance(val, str) and _type_op == str:
+            _string += f'{key}=\'{_type_op(val)}\''
+        else:
+            _string += f'{key}={val}'
 
         if i != len(items) - 1:
             _string += ', '
@@ -93,10 +99,14 @@ def _repr(self) -> str:
     _string = self.__class__.__name__ + '('
     for i, item in enumerate(items):
         key, val = item[0], item[1]
+
         if isinstance(val, ScalarElementColumnDefault):
             val = val.arg
         
-        _string += f'{key} = {str(val)}'
+        if isinstance(val, bool or int or float) or val is None:
+            _string += f'{key}={str(val)}'
+        else:
+            _string += f'{key}=\'{str(val)}\''
 
         if i != len(items) - 1:
             _string += ', '
@@ -152,16 +162,28 @@ def _update_docstring(cls) -> str:
 
     return NotImplementedError
 
-def _to_dict(cls):
-    _dict = {}
-    for col in cls.__mapper__.columns:
-        _dict[col.name] = cls[col.name]
-    
-    return _dict
+def _keys(cls) -> list[str]:
+    return [c.name for c in cls.__table__.columns]
+
+def _values(cls) -> list[Any]:
+    return [cls[k] for k in cls.keys()]
+
+def _items(cls) ->  Iterator[tuple[str, Any]]:
+    return zip(cls.keys(), cls.values())
+
+def _to_dict(cls) -> dict[str, Any]:
+    return {k : v for k, v in cls.items()}
+
+
+# def _to_dict(cls) -> dict:
+
+#     keys = [c.name for c in cls.__table__.columns]
+
+#     return {k : getattr(cls, k) for k in keys}
 
 # ==============================================================================
 
-class LibraMetaClass(DeclarativeMeta):
+class MetaClass(DeclarativeMeta):
     """
     Metaclass to be used within the instantiation of an SQLAlchemy declarative 
     base class, that will bequeath its methods onto all subclasses inheriting 
@@ -178,7 +200,11 @@ class LibraMetaClass(DeclarativeMeta):
         dct['__setitem__'] = _setitem
         dct['__len__']     = _len
         dct['__eq__']      = _eq
+        dct['keys']        = _keys
+        dct['values']      = _values
+        dct['items']       = _items
         dct['to_dict']     = _to_dict
+
         # Equal methods that compare on unique keys & all columns would be useful
 
         dct['_col_registry'] = {}
@@ -203,10 +229,10 @@ class LibraMetaClass(DeclarativeMeta):
         except ValueError: # Not a schema-qualified name
             dct['_tableowner'] = None
 
-        return super(LibraMetaClass, cls).__new__(cls, clsname, parents, dct)
+        return super(MetaClass, cls).__new__(cls, clsname, parents, dct)
     
     def __init__(cls, clsname, parents, dct) -> None:
-        super(LibraMetaClass, cls).__init__(clsname, parents, dct)
+        super(MetaClass, cls).__init__(clsname, parents, dct)
 
         if hasattr(cls, '__table__'):
             cls._attrname = {col.name : col.key for col in cls.__mapper__.columns}

@@ -1,0 +1,36 @@
+Test Schema :
+  description : "Schema used for testing Libra"
+  columns : 
+    testcolumn1 :
+      sa_coltype : Integer
+      description : 'Test Column 1'
+    testcolumn2 : 
+      sa_coltype : String(128)
+      description : 'Test Column 2'
+    testcolumn3 : 
+      sa_coltype : DateTime
+      default_val : 'datetime.now(timezone.utc)'
+      description : 'Test Column 3'
+    testcolumn4 :
+      sa_coltype : Float(precision=53)
+      default_val : 999.999
+      description : 'Test Column 4'
+  models :
+    testmodel1 :
+      description : 'Test Model 1'
+      columns :
+        - testcolumn1 : {nullable : False}
+        - testcolumn2 : {nullable : False}
+        - testcolumn3 : {nullable : False}
+        - testcolumn4 : {nullable : False}
+      constraints :
+        - pk : [testcolumn1]
+        - uq : [testcolumn2, testcolumn3]
+    testmodel2 :
+      description : 'Test Model 2'
+      columns : 
+        - testcolumn1 : {nullable : False}
+        - testcolumn2 : {nullable : False}
+        - testcolumn3 : {nullable : False}
+      constraints :
+        - pk : [testcolumn1, testcolumn2]
