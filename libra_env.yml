@@ -3,10 +3,8 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
-  - pip
-  - pip:
-    - cx-Oracle
-    - pydantic
-    - pydantic-settings
-    - pyyaml
-    - sqlalchemy>=2.0
+  - cx_oracle
+  - pydantic
+  - pydantic-settings
+  - pyyaml
+  - sqlalchemy>=2.0
