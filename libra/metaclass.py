@@ -10,16 +10,16 @@ any declarative base model inheriting from from `MetaClass`.
 # ==============================================================================
 
 from __future__ import annotations
-from typing import Any, List
-from typing import Optional, Self, Type, Union, Iterator
+import decimal
+from typing import Any
+from typing import Iterator
+import pdb
 
 import sqlalchemy
-from sqlalchemy import inspect
-from sqlalchemy.orm import DeclarativeMeta, DeclarativeBase
+from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm.decl_base import _declarative_constructor
 from sqlalchemy.sql.schema import ScalarElementColumnDefault
-from sqlalchemy.sql.schema import CallableColumnDefault
 
 # ==============================================================================
 
@@ -34,7 +34,7 @@ def _positional_init(self, *args : Any) -> None:
     for column, ival in zip(self.__table__.columns, args):
         # This can be done better
         if ival is None and column.default:
-            setattr(self, self._attrname[column.name], column.default)
+            setattr(self, self._attrname[column.name], column.default.arg)
         else:
             setattr(self, self._attrname[column.name], ival)
 
@@ -47,13 +47,13 @@ def _keyword_init(self, **kwargs : Any) -> None:
     for column in self.__mapper__.columns:
         val = getattr(self, column.name, None)
         if val is None and column.default:
-            setattr(self, self._attrname[column.name], column.default)
+            setattr(self, self._attrname[column.name], column.default.arg)
         else:
             setattr(self, self._attrname[column.name], val)
         
 # ==============================================================================
 
-def _init(self, *args : Optional[Any], **kwargs : Optional[Any]) -> None:
+def _init(self, *args : Any | None, **kwargs : Any | None) -> None:
     """
     TODO: _init docstring
     """
@@ -76,6 +76,7 @@ def _str(self) -> str:
     _string = self.__class__.__name__ + '('
     for i, item in enumerate(items):
         key, _type_op, val = item[0], item[1], item[2]
+
         if isinstance(val, ScalarElementColumnDefault):
             val = val.arg
         
@@ -94,26 +95,30 @@ def _repr(self) -> str:
     TODO: _repr() docstring
     """
 
-    items = [(col.name, getattr(self, col.name)) for col in self.__mapper__.primary_key]
+    items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.primary_key]
 
     _string = self.__class__.__name__ + '('
     for i, item in enumerate(items):
-        key, val = item[0], item[1]
+        key, _type_op, val = item[0], item[1], item[2]
 
         if isinstance(val, ScalarElementColumnDefault):
             val = val.arg
         
-        if isinstance(val, bool or int or float) or val is None:
-            _string += f'{key}={str(val)}'
+        if isinstance(val, str) and _type_op == str:
+            _string += f'{key}=\'{val}\''
         else:
-            _string += f'{key}=\'{str(val)}\''
+            _string += f'{key}={val}'
+        # if isinstance(val, bool or int or float or decimal.Decimal) or val is None:
+        #     _string += f'{key}={val}'
+        # else:
+        #     _string += f'{key}=\'{str(val)}\''
 
         if i != len(items) - 1:
             _string += ', '
 
     return _string + ')'
 
-def _getitem(self, item : Union[int, str]) -> Any: 
+def _getitem(self, item : int | str) -> Any: 
     """
     TODO: _getitem() docstring
     """
@@ -128,7 +133,7 @@ def _getitem(self, item : Union[int, str]) -> Any:
     
     return val
 
-def _setitem(self, item : Union[int, str], val : Any) -> None: 
+def _setitem(self, item : int | str, val : Any) -> None: 
     """
     TODO: _setitem() docstring
     """
@@ -148,7 +153,7 @@ def _len(self) -> int:
 
     return len(self.__table__.columns)
 
-def _eq(self, other : Self) -> bool: 
+def _eq(self, other : type[MetaClass]) -> bool: 
     """
     TODO: _eq() docstring
     """
@@ -213,8 +218,6 @@ class MetaClass(DeclarativeMeta):
             schema, tablename = dct['__tablename__'].split('.')
             dct['__tableowner__'], dct['__tablename__'] = schema, tablename
 
-            # class SchemaBase(DeclarativeBase):
-            #     metadata = sqlalchemy.MetaData(schema = schema)
             SchemaBase = declarative_base(metadata = sqlalchemy.MetaData(schema=schema))
             
             for p in parents:

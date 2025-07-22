@@ -10,19 +10,21 @@ type `Handler` include the `TypeHandler`, which constructs and deconstructs
 SQLAlchemy.types objects to/from regular Python strings; the `ColumnHandler`, 
 which constructs and deconstructs SQLAlchemy.Column objects to/from regular 
 Python dictionaries; and the `ConstraintHandler`, which constructs and 
-deconstructs children of SQLAlchemy.constraint objects, including Constraint,
-PrimaryKeyConstraint, UniqueConstraint, ForeignKeyConstraint, and CheckConstraint.
+deconstructs children of SQLAlchemy.constraint objects, including
+PrimaryKeyConstraint and UniqueConstraint.
 """
 
 # ==============================================================================
 
 import re
 import ast
+import pdb
+import inspect
 import importlib
 import datetime
 from abc import ABC, abstractmethod
 from functools import singledispatch
-from typing import Type, Any, TypeVar
+from typing import List, Any, TypeVar
 from copy import deepcopy
 
 import sqlalchemy
@@ -41,6 +43,7 @@ from sqlalchemy.types import (
     DOUBLE, DOUBLE_PRECISION, FLOAT, INT, JSON, INTEGER, NCHAR, NVARCHAR, 
     NUMERIC, REAL, SMALLINT, TEXT, TIME, TIMESTAMP, UUID, VARBINARY, VARCHAR
 )
+from sqlalchemy.inspection import inspect as _inspect
 
 from .util import Evaluator
 
@@ -191,6 +194,7 @@ class Handler(ABC):
         """Builds plain-text description of an object given the object"""
         ...
 
+
 class TypeHandler(Handler):
 
     def __init__(self, typemap : TypeMap = TypeMap()) -> None:
@@ -259,7 +263,29 @@ class TypeHandler(Handler):
                 return _sa_type(*_args, **_kwargs)
 
     def deconstruct(self, satype : SaType) -> str:
-        return NotImplementedError
+
+        nondef_params = {}
+        signature = inspect.signature(satype.__init__)
+
+        for name, param in signature.parameters.items():
+            try:
+                if satype.__dict__[name] != param.default:
+                    nondef_params.update({name : satype.__dict__[name]})
+            except KeyError:
+                pass
+        
+        # Gently massage the return string
+        return_str = f'{satype.__class__.__name__}'
+        if nondef_params != {}:
+            return_str += '('
+            for i, (key, val) in enumerate(nondef_params.items()):
+                return_str = f'{return_str}{key}={val}'
+                if i != len(nondef_params.keys()) - 1:
+                    return_str += ', '
+            return_str += ')'
+
+        return return_str
+
 
 class ColumnHandler(Handler):
     
@@ -329,35 +355,68 @@ class ColumnHandler(Handler):
 
         return Column(col_name, _type, **col_dict)
 
-    def deconstruct(self, column : Column) -> dict[str, str | dict]:
-        return NotImplementedError
+    def deconstruct(self, col_name : str, column : Column) -> dict[str, str | dict]:
+
+        # Don't include any standard default arguments in Column initialization
+        # Or any additional parameters that are specified here
+        _additional_exclude_params = {
+            'nullable' : True,
+            'default' : None
+        }
+        
+        nondef_params = {}
+        signature = inspect.signature(column.__init__)
+        for name, param in signature.parameters.items():
+            try:
+                if column.__dict__[name] != param.default:
+                    nondef_params.update({name : column.__dict__[name]})
+            except KeyError:
+                pass
+        
+        new_params = {'sa_coltype' : self.typehandler.deconstruct(column.type)}
+
+        for key, val in nondef_params.items():
+            if key in _additional_exclude_params.keys() and val == _additional_exclude_params[key]:
+                pass
+            else:
+                new_params[key] = val
+
+        # TODO: Deal with ScalarElementColumnDefault & Info Dictionary
+        
+        return {col_name : new_params}
+
 
 class ConstraintHandler(Handler):
-    # TODO: Remove support for foreign keys and check constraints. Only support Primary and Unique constraints
-    
-    def construct(self, tablename : str, con_type : str, columns : list[str]) -> type[Constraint]:
-
-        # NOTE: Libra will autoformat a name for the constraint.
+    def construct(self, con_list : list[dict[str, list[str]]]) -> tuple[Constraint]:
         
-        _idx = tablename.find('.')
-        if _idx != -1:
-            tablename = tablename[_idx+1:]
+        constraints = []
+        for constraint in con_list:
+            for key_type, columns in constraint.items():
+                match key_type:
+                    case 'pk':
+                        constraints.append(PrimaryKeyConstraint(*columns))
+                    case 'uq':
+                        constraints.append(UniqueConstraint(*columns))
+                    case _:
+                        raise NotImplementedError('Foreign Keys, Check Constraints, and Index values not currently supported under Libra.')
+        
+        return tuple(constraints)
+    
+    def deconstruct(self, constraints : tuple[type[Constraint]]) -> list[dict[str, List[str]]]:
+        
+        return_con = []
+        for con in constraints:
+            inspector = _inspect(con)
 
-        match con_type:
-            case 'pk':
-                name = f'{tablename}_pk'
+            columns = inspector._pending_colargs
 
-                return PrimaryKeyConstraint(*columns, name = name)
-
-            case 'uq': 
-                name = f'{tablename}_uq'
-                
-                return UniqueConstraint(*columns, name = name)
+            if type(con) == PrimaryKeyConstraint:
+                return_con.append({'pk' : columns})
+            elif type(con) == UniqueConstraint:
+                return_con.append({'uq' : columns})
+            else:
+                raise NotImplementedError
             
-            case _:
-                raise NotImplementedError('Foreign Keys, Check Constraints, and Index Values are not currently supported by Libra.')
-
-    def deconstruct(self, constraint : Constraint) -> dict[str, str | list[str]]:
-        return NotImplementedError
+        return return_con
 
 # ==============================================================================
