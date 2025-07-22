@@ -342,14 +342,15 @@ class Test_SchemaDispatchStrategy(unittest.TestCase):
 class Test_SchemaLoad_Dictionary(unittest.TestCase):
     """Test Schema Load functionality for Python Dictionaries."""
 
-    schema_name : str = 'Test Schema Dictionary 1'
+    schema_name01 : str = 'Test Schema Dictionary 1'
+    schema_name02 : str = 'Test Schema Dictionary 2'
     dictionary : dict = TEST_DICT_01
     typemap : TypeMap = TypeMap({'String' : VARCHAR})
     settings = DictionarySettings(dictionary = dictionary)
 
-    def test_load_dictionary(self):
+    def test_load_dictionary_01(self):
         
-        schema = Schema(self.schema_name).load(self.settings)
+        schema = Schema(self.schema_name01).load(self.settings)
 
         class Model01(schema.model01):
             __tablename__ = 'model01'
@@ -358,16 +359,16 @@ class Test_SchemaLoad_Dictionary(unittest.TestCase):
 
         return self.assertEqual(model.column01, 'testing')
 
-    def test_load_dictionary_w_typemap(self):
+    def test_load_dictionary_w_typemap_01(self):
 
-        schema = Schema(self.schema_name, typemap = self.typemap).load(self.settings)
+        schema = Schema(self.schema_name01, typemap = self.typemap).load(self.settings)
 
         class Model01(schema.model01):
             __tablename__ = 'model01'
 
         return self.assertEqual(type(Model01.column01.type), type(VARCHAR()))
 
-    def test_load_dictionary_w_mixins(self):
+    def test_load_dictionary_w_mixins_01(self):
         
         class MyMixin01:
             def _message(self, message : str) -> str:
@@ -380,7 +381,7 @@ class Test_SchemaLoad_Dictionary(unittest.TestCase):
         class MyMixin03:
             column05 = Column(String(length = 15), default = 'Default Text')
         
-        schema = Schema(self.schema_name, mixins = (MyMixin01, MyMixin02, MyMixin03)).load(self.settings)
+        schema = Schema(self.schema_name01, mixins = (MyMixin01, MyMixin02, MyMixin03)).load(self.settings)
         
         class Model01(schema.model01):
             __tablename__ = 'model01'
@@ -390,6 +391,59 @@ class Test_SchemaLoad_Dictionary(unittest.TestCase):
         self.assertEqual(mod._message('testing'), 'testing')
         self.assertEqual(mod._get_col1(), 'test')
         self.assertEqual(mod.column05, 'Default Text')
+
+    def test_load_dictionary_02(self):
+        
+        schema = Schema(self.schema_name02).load(self.settings)
+
+        class Model01(schema.model01):
+            __tablename__ = 'model01'
+
+        model = Model01('testing', None)
+
+        return self.assertEqual(model.column01, 'testing')
+
+    def test_load_dictionary_w_typemap_02(self):
+
+        schema = Schema(self.schema_name02, typemap = self.typemap).load(self.settings)
+
+        class Model01(schema.model01):
+            __tablename__ = 'model01'
+
+        return self.assertEqual(type(Model01.column01.type), type(VARCHAR()))
+
+    def test_load_dictionary_w_mixins_02(self):
+        
+        class MyMixin01:
+            def _message(self, message : str) -> str:
+                return message
+            
+        class MyMixin02:
+            def _get_col1(self) -> str:
+                return self.column01
+            
+        class MyMixin03:
+            column05 = Column(String(length = 15), default = 'Default Text')
+        
+        schema = Schema(self.schema_name02, mixins = (MyMixin01, MyMixin02, MyMixin03)).load(self.settings)
+        
+        class Model01(schema.model01):
+            __tablename__ = 'model01'
+        
+        mod = Model01(column01 = 'test', column02 = None)
+
+        self.assertEqual(mod._message('testing'), 'testing')
+        self.assertEqual(mod._get_col1(), 'test')
+        self.assertEqual(mod.column05, 'Default Text')
+
+    
+class Test_SchemaLoad_YAML(unittest.TestCase):
+    pass
+
+
+class Test_SchemaLoad_Database(unittest.TestCase):
+    pass
+
 
 # ==============================================================================
 # Classes to handle Schema Writing
