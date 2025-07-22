@@ -81,7 +81,7 @@ site_table_query = session.query(Site).all()
 ```
 Executing this code will first construct all models belonging to the 
 **NNSA KB Core** schema, a common set of tables used in the seismological 
-sciences. A new class is created that inherits from the "Site" model and is  
+sciences. A new class is created that inherits from the "Site" model and is 
 mapped back to the relational database using the `__tablename__` attribute.
 With a `Session` object, `SQLAlchemy` formulates and passes Data Definition 
 Language (DDL) onto the database backend, allowing for standard SQL 
