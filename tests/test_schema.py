@@ -368,7 +368,28 @@ class Test_SchemaLoad_Dictionary(unittest.TestCase):
         return self.assertEqual(type(Model01.column01.type), type(VARCHAR()))
 
     def test_load_dictionary_w_mixins(self):
-        pass
+        
+        class MyMixin01:
+            def _message(self, message : str) -> str:
+                return message
+            
+        class MyMixin02:
+            def _get_col1(self) -> str:
+                return self.column01
+            
+        class MyMixin03:
+            column05 = Column(String(length = 15), default = 'Default Text')
+        
+        schema = Schema(self.schema_name, mixins = (MyMixin01, MyMixin02, MyMixin03)).load(self.settings)
+        
+        class Model01(schema.model01):
+            __tablename__ = 'model01'
+        
+        mod = Model01(column01 = 'test')
+
+        self.assertEqual(mod._message('testing'), 'testing')
+        self.assertEqual(mod._get_col1(), 'test')
+        self.assertEqual(mod.column05, 'Default Text')
 
 # ==============================================================================
 # Classes to handle Schema Writing

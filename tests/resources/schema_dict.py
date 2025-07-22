@@ -36,6 +36,26 @@ TEST_DICT_01 = {
                 'constraints' : [{'pk' : ['column01']}]
             }
         }
+    },
+    'Test Schema Dictionary 2' : {
+        'description' : 'Additional schema for testing purposes',
+        'columns' : {
+            'column01' : {
+                'sa_coltype' : 'String(30)',
+                'nullable' : 'False'
+            },
+            'column02' : {
+                'sa_coltype' : 'DateTime',
+                'onupdate' : 'datetime.now(timezone.utc)',
+                'default' : 'datetime.now(timezone.utc)'
+            }
+        },
+        'models' : {
+            'model01' : {
+                'columns' : ['column01', 'column02'],
+                'constraints' : [{'pk' : ['column01'], 'uq' : ['column02']}]
+            }
+        }
     }
 }
 
