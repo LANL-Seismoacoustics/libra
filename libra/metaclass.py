@@ -70,8 +70,10 @@ def _str(self) -> str:
     """
     TODO: _str() docstring
     """
-
-    items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.columns]
+    try:
+        items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.columns]
+    except NotImplementedError:
+        items = [(col.name, str, getattr(self, col.name))for col in self.__mapper__.columns]
 
     _string = self.__class__.__name__ + '('
     for i, item in enumerate(items):
@@ -94,8 +96,10 @@ def _repr(self) -> str:
     """
     TODO: _repr() docstring
     """
-
-    items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.primary_key]
+    try:
+        items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.primary_key]
+    except NotImplementedError:
+        items = [(col.name, str, getattr(self, col.name))for col in self.__mapper__.primary_key]
 
     _string = self.__class__.__name__ + '('
     for i, item in enumerate(items):

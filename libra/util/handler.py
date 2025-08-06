@@ -233,6 +233,9 @@ class TypeHandler(Handler):
 
         try:
             _inputs = re.findall(r'\(([^)]*)\)', type_str)
+            if ',' in _inputs[0]:
+                _in = [_i for _i in _inputs[0].split(',')]
+                _inputs = _in
         except IndexError:
             _inputs = None
 

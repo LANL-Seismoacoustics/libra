@@ -54,3 +54,6 @@ class DatabaseSettings(_SchemaSettings):
     columnassoc        : str = 'columnassoc'
     columndescript     : str = 'columndescript'
     constraintdescript : str = 'constraintdescript'
+
+    # Optional Author Field
+    author : str | None = None

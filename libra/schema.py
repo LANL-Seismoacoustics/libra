@@ -27,8 +27,10 @@ from typing import Any
 from typing import Self, TextIO
 
 import yaml
-import sqlalchemy
+from sqlalchemy import and_
+from sqlalchemy import create_engine
 from sqlalchemy import Column
+from sqlalchemy.orm import Session
 from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.declarative import declared_attr
@@ -206,10 +208,10 @@ class Schema:
             If None, all models associated with the schema are written. Default 
             is None.
         """
-
+        
         transfer_strat = self._dispatch_strategy(settings)
 
-        transfer_strat.write(settings, models)
+        return transfer_strat.write(self, settings, models)
 
 # ==============================================================================
 
@@ -299,7 +301,22 @@ class DictionaryTransferStrategy(TransferStrategy):
         -------
         """
 
-        pass
+        if not settings.dictionary:
+            dictionary = {}
+        else:
+            dictionary = settings.dictionary
+
+        schema_dict = {
+            schema.name : {
+                'description' : schema.description,
+                'columns' : schema.registry.columns,
+                'models' : schema.registry.models
+            }
+        }
+
+        dictionary.update(schema_dict)
+
+        return dictionary
 
 
 class YAMLFileTransferStrategy(TransferStrategy):
@@ -314,28 +331,53 @@ class YAMLFileTransferStrategy(TransferStrategy):
     write
         Method to write abstract ORM instances (models) to a YAML file.
     """
+
+    @staticmethod
+    def _open_yaml_file(settings : YAMLFileSettings) -> dict:
+        """Open a YAML file, return the contents as a Python dictionary"""
+
+        if hasattr(settings, 'file'):
+            with open(settings.file, 'r') as file:
+                return yaml.safe_load(file)
+        else:
+            raise AttributeError('YAMLFileSetttings object must have \'file\' defined as an attribute.')
     
     def load(
         schema : Schema,
-        settings : YAMLFileSettings, *,
+        settings : YAMLFileSettings,
         models : list[str] | None = None
     ) -> Schema:
         """
         Method to load abstract ORM instances (models) from a YAML file.
         """
 
-        pass
+        schema_dict = YAMLFileTransferStrategy._open_yaml_file(settings)
+
+        settings = DictionarySettings(dictionary = schema_dict)
+
+        return DictionaryTransferStrategy.load(schema, settings, models)
 
     def write(
         schema : Schema,
-        settings : YAMLFileSettings, *,
+        settings : YAMLFileSettings,
         models : list[str] | None = None
-    ) -> TextIO:
+    ) -> None:
         """
         Method to write abstract ORM instances (models) to a YAML file.
         """
 
-        pass
+        schema_dict = DictionaryTransferStrategy.write(schema, DictionarySettings(), models)
+        
+        dictionary = {}
+        try:
+            dictionary = YAMLFileTransferStrategy._open_yaml_file(settings)
+        except FileNotFoundError:
+            pass # File doesn't exist
+
+        dictionary.update(schema_dict)
+
+        with open(settings.file, 'w') as f:
+            yaml.safe_dump(dictionary, f, default_flow_style = False)
 
 
 class DatabaseTransferStrategy(TransferStrategy):
@@ -351,9 +393,33 @@ class DatabaseTransferStrategy(TransferStrategy):
         Method to write abstract ORM instances (models) to database tables.
     """
 
+    @staticmethod
+    def _get_session(settings : DatabaseSettings) -> Session:
+        """Initialize a database session from a connection string."""
+
+        engine = create_engine(settings.connection_str)
+
+        return Session(bind = engine)
+
+    @staticmethod
+    def _pop_entries(d : dict[str, Any] | list[dict[str, Any]]) -> dict[str, Any] | list[dict[str, Any]]:
+        """Pops 'moddate', 'loaddate', 'modauthor', & 'loadauthor' from a dictionary"""
+
+        keys = ['schema_name', 'modauthor', 'loadauthor', 'moddate', 'loaddate']
+
+        def _pop(_d : dict[str, Any]) -> dict[str, Any]:
+            for key in keys:
+                _d.pop(key, None)
+            return _d
+
+        if isinstance(d, list):
+            return [_pop(_i) for _i in d]
+        else:
+            return _pop(d)
+
     def load(
         schema : Schema,
-        settings : DatabaseSettings, *,
+        settings : DatabaseSettings,
         models : list[str] | None = None
     ) -> Schema:
         """
@@ -372,11 +438,71 @@ class DatabaseTransferStrategy(TransferStrategy):
             is None.
         """
 
-        pass
+        session = DatabaseTransferStrategy._get_session(settings)
+
+        libra = Schema('Libra', typemap = schema.typemap).load(YAMLFileSettings(file = LIBRA_YAML))
+
+        # Make schema description tables if they don't already exist
+        class SchemaDescript(libra.schemadescript): __tablename__ = settings.schemadescript
+        class ModelDescript(libra.modeldescript): __tablename__ = settings.modeldescript
+        class ColumnDescript(libra.columndescript): __tablename__ = settings.columndescript
+        class ColumnAssoc(libra.columnassoc): __tablename__ = settings.columnassoc
+        class ConstraintDescript(libra.constraintdescript): __tablename__ = settings.constraintdescript
+
+        libra.base.metadata.create_all(session.bind, checkfirst = True)
+
+        # Use queries and dictionary manipulation to get in form of a Python dict
+        schema_dict = DatabaseTransferStrategy._pop_entries(session.query(SchemaDescript).filter(SchemaDescript.schema_name == schema.name).first().to_dict())
+        
+        schema_dict['columns'] = {}
+        schema_dict['models'] = {}
+        
+        model_dict = DatabaseTransferStrategy._pop_entries([_q.to_dict() for _q in session.query(ModelDescript).filter(ModelDescript.schema_name == schema.name).all()]) # This is disgusting
+        column_dict = DatabaseTransferStrategy._pop_entries([_q.to_dict() for _q in session.query(ColumnDescript).filter(ColumnDescript.schema_name == schema.name).all()])
+
+        coldef = {}
+        for entry in column_dict:
+            coldef.update({entry.pop('column_name') : entry})
+
+        for row in model_dict:
+            desc = row.get('description', None)
+
+            colassoc_query = DatabaseTransferStrategy._pop_entries([_q.to_dict() for _q in session.query(ColumnAssoc).filter(and_(ColumnAssoc.schema_name == schema.name, ColumnAssoc.model_name == row['model_name'])).order_by(ColumnAssoc.column_position).all()]) # This is even more disgusting
+            constraint_query = DatabaseTransferStrategy._pop_entries([_q.to_dict() for _q in session.query(ConstraintDescript).filter(and_(ConstraintDescript.schema_name == schema.name, ConstraintDescript.model_name == row['model_name'])).all()])
+            columnlist = [_r['column_name'] for _r in colassoc_query]
+
+            for coldict in colassoc_query:
+                column_name = coldict.pop('column_name')
+                [coldict.pop(key) for key in ['model_name', 'column_position']]
+                
+                coldef[column_name].update(coldict)
+            
+            condef = []
+            for con in constraint_query:
+                contype = con.pop('constraint_type')
+                condef.append({contype : [s_.strip() for s_ in con['columns'].split(',')]})
+
+            if desc:
+                schema_dict['models'][row['model_name']] = {
+                    'description' : desc,
+                    'columns' : columnlist,
+                    'constraints' : condef
+                }
+            else:
+                schema_dict['models'][row['model_name']] = {
+                    'columns' : columnlist,
+                    'constraints' : condef
+                }
+
+        schema_dict['columns'] = coldef
+
+        settings = DictionarySettings(dictionary = {schema.name : schema_dict})
+
+        return DictionaryTransferStrategy.load(schema, settings, models)
 
     def write(
         schema : Schema,
-        settings : DatabaseSettings, *,
+        settings : DatabaseSettings,
         models : list[str] | None = None
     ) -> None:
         """
@@ -395,7 +521,51 @@ class DatabaseTransferStrategy(TransferStrategy):
             Default is None.
         """
 
-        pass
+        session = DatabaseTransferStrategy._get_session(settings)
+
+        libra = Schema('Libra', typemap = schema.typemap).load(YAMLFileSettings(file = LIBRA_YAML))
+
+        # Make schema description tables if they don't already exist
+        class SchemaDescript(libra.schemadescript): __tablename__ = settings.schemadescript
+        class ModelDescript(libra.modeldescript): __tablename__ = settings.modeldescript
+        class ColumnDescript(libra.columndescript): __tablename__ = settings.columndescript
+        class ColumnAssoc(libra.columnassoc): __tablename__ = settings.columnassoc
+        class ConstraintDescript(libra.constraintdescript): __tablename__ = settings.constraintdescript
+        
+        # SchemaDescript
+        session.add(SchemaDescript(
+            schema_name = schema.name,
+            description = schema.description,
+            modauthor = settings.author,
+            loadauthor = settings.author
+        ))
+
+        # ModelDescript
+        for model in schema.registry.models.keys():
+            session.add(ModelDescript(
+                model_name = model,
+                description = schema.registry.models[model].get('description', None),
+                schema_name = schema.name,
+                modauthor = settings.author,
+                loadauthor = settings.author
+            ))
+
+            # Do Columnassoc & ConstraintDescript here too?
+        
+        # ColumnDescript
+        for column, coldict in schema.registry.columns.items():
+            session.add(ColumnDescript(
+                column_name = column,
+                column_alias = coldict.get('column_alias', None),
+                sa_coltype = coldict.get('sa_coltype', None),
+                default = coldict.get('default', None),
+                description = coldict.get('description', None),
+                schema_name = schema.name,
+                modauthor = settings.author,
+                loadauthor = settings.author
+            ))
+
+        pdb.set_trace()
 
 # ==============================================================================
 
