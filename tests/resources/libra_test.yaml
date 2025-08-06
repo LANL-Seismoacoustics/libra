@@ -1,36 +1,88 @@
-Test Schema :
-  description : "Schema used for testing Libra"
-  columns : 
-    testcolumn1 :
-      sa_coltype : Integer
-      description : 'Test Column 1'
-    testcolumn2 : 
-      sa_coltype : String(128)
-      description : 'Test Column 2'
-    testcolumn3 : 
-      sa_coltype : DateTime
-      default_val : 'datetime.now(timezone.utc)'
-      description : 'Test Column 3'
-    testcolumn4 :
-      sa_coltype : Float(precision=53)
-      default_val : 999.999
-      description : 'Test Column 4'
-  models :
-    testmodel1 :
-      description : 'Test Model 1'
-      columns :
-        - testcolumn1 : {nullable : False}
-        - testcolumn2 : {nullable : False}
-        - testcolumn3 : {nullable : False}
-        - testcolumn4 : {nullable : False}
-      constraints :
-        - pk : [testcolumn1]
-        - uq : [testcolumn2, testcolumn3]
-    testmodel2 :
-      description : 'Test Model 2'
-      columns : 
-        - testcolumn1 : {nullable : False}
-        - testcolumn2 : {nullable : False}
-        - testcolumn3 : {nullable : False}
-      constraints :
-        - pk : [testcolumn1, testcolumn2]
+Test Schema 1:
+  columns:
+    column01:
+      sa_coltype: BigInteger()
+    column02:
+      sa_coltype: Boolean(create_constraint = True, name = 'col02_ck')
+    column03:
+      sa_coltype: Date()
+    column04:
+      sa_coltype: DateTime(timezone = True)
+    column05:
+      sa_coltype: Double()
+    column06:
+      sa_coltype: Enum('a', 'b', 'c', name = 'myenum', create_constraint = True)
+    column07:
+      sa_coltype: Float(precision = 53, asdecimal = True, decimal_return_scale = 3)
+    column08:
+      sa_coltype: Integer()
+    column09:
+      sa_coltype: Interval(False, 2, 1)
+    column10:
+      sa_coltype: LargeBinary(32)
+    column11:
+      sa_coltype: Numeric(precision = 9, scale = 0, asdecimal = False)
+    column12:
+      sa_coltype: PickleType(protocol = 0)
+    column13:
+      sa_coltype: SmallInteger()
+    column14:
+      sa_coltype: String(15, collation = 'utf8')
+    column15:
+      sa_coltype: Text(length = 15, collation = 'utf8')
+    column16:
+      sa_coltype: Time()
+    column17:
+      sa_coltype: Unicode(30, collation = 'utf8')
+    column18:
+      sa_coltype: UnicodeText()
+    column19:
+      sa_coltype: Uuid(as_uuid = True, native_uuid = True)
+  description: 'Schema #1 for testing purposes'
+  models:
+    model01:
+      columns:
+      - column01
+      - column14
+      - column02
+      - column05
+      - column06
+      - column16
+      - column04
+      constraints:
+      - pk:
+        - column01
+      - uq:
+        - column14
+      description: 'Test Model #1'
+    model02:
+      columns:
+      - column08
+      - column03
+      - column09
+      - column12
+      - column18
+      - column04
+      constraints:
+      - pk:
+        - column08
+        - column03
+      description: 'Test Model #2'
+    model03:
+      columns:
+      - column13
+      - column11
+      - column19
+      - column17
+      - column15
+      - column10
+      - column07
+      - column04
+      constraints:
+      - pk:
+        - column19
+      - uq:
+        - column13
+        - column11
+        - column10
+      description: 'Test Model #3'

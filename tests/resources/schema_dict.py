@@ -6,54 +6,53 @@ Contains global dictionaries containing an example schema for testing purposes.
 """
 
 # ==============================================================================
-
-from sqlalchemy.types import (
-    BigInteger, Boolean, Date, DateTime, Enum, Double, Float, Integer, Interval,
-    LargeBinary, Numeric, PickleType, SmallInteger, String, Text, Time, Unicode,
-    UnicodeText, Uuid
-)
-from sqlalchemy.types import (
-    ARRAY, BIGINT, BINARY, BLOB, BOOLEAN, CHAR, CLOB, DATE, DATETIME, DECIMAL,
-    DOUBLE, DOUBLE_PRECISION, FLOAT, INT, JSON, INTEGER, NCHAR, NVARCHAR, 
-    NUMERIC, REAL, SMALLINT, TEXT, TIME, TIMESTAMP, UUID, VARBINARY, VARCHAR
-)
+# List of necessary Column.__init__() args to test
+# name, type_, 
 
 # ==============================================================================
 
-TEST_DICT_01 = {
-    'Test Schema Dictionary 1' : {
-        'description' : 'Schema for testing purposes.',
+TEST_DICT = {
+    'Test Schema 1' : {
+        'description' : 'Schema #1 for testing purposes',
         'columns' : {
-            'column01' : {
-                'sa_coltype' : 'String(30)',
-                'description' : ''
-            }
+            'column01' : {'sa_coltype' : 'BigInteger()'},
+            'column02' : {'sa_coltype' : "Boolean(create_constraint = True, name = 'col02_ck')"},
+            'column03' : {'sa_coltype' : 'Date()'},
+            'column04' : {'sa_coltype' : 'DateTime(timezone = True)'},
+            'column05' : {'sa_coltype' : 'Double()'},
+            'column06' : {'sa_coltype' : "Enum('a', 'b', 'c', name = 'myenum', create_constraint = True)"},
+            'column07' : {'sa_coltype' : 'Float(precision = 53, asdecimal = True, decimal_return_scale = 3)'},
+            'column08' : {'sa_coltype' : 'Integer()'},
+            'column09' : {'sa_coltype' : 'Interval(False, 2, 1)'},
+            'column10' : {'sa_coltype' : 'LargeBinary(32)'},
+            'column11' : {'sa_coltype' : 'Numeric(precision = 9, scale = 0, asdecimal = False)'},
+            'column12' : {'sa_coltype' : 'PickleType(protocol = 0)'},
+            'column13' : {'sa_coltype' : 'SmallInteger()'},
+            'column14' : {'sa_coltype' : "String(15, collation = 'utf8')"},
+            'column15' : {'sa_coltype' : "Text(length = 15, collation = 'utf8')"},
+            'column16' : {'sa_coltype' : 'Time()'},
+            'column17' : {'sa_coltype' : "Unicode(30, collation = 'utf8')"},
+            'column18' : {'sa_coltype' : 'UnicodeText()'},
+            'column19' : {'sa_coltype' : 'Uuid(as_uuid = True, native_uuid = True)'}
         },
         'models' : {
             'model01' : {
-                'description' : '',
-                'columns' : ['column01'],
-                'constraints' : [{'pk' : ['column01']}]
-            }
-        }
-    },
-    'Test Schema Dictionary 2' : {
-        'description' : 'Additional schema for testing purposes',
-        'columns' : {
-            'column01' : {
-                'sa_coltype' : 'String(30)',
-                'nullable' : 'False'
+                'description' : 'Test Model #1',
+                # int, str, bool, float, Enum, datetime, datetime
+                'columns' : ['column01', 'column14', 'column02', 'column05', 'column06', 'column16', 'column04'],
+                'constraints' : [{'pk' : ['column01'], 'uq' : ['column14']}]
             },
-            'column02' : {
-                'sa_coltype' : 'DateTime',
-                'onupdate' : 'datetime.now(timezone.utc)',
-                'default' : 'datetime.now(timezone.utc)'
-            }
-        },
-        'models' : {
-            'model01' : {
-                'columns' : ['column01', 'column02'],
-                'constraints' : [{'pk' : ['column01'], 'uq' : ['column02']}]
+            'model02' : {
+                'description' : 'Test Model #2',
+                # int, datetime, timedelta, pickle, str, datetime
+                'columns' : ['column08', 'column03', 'column09', 'column12', 'column18', 'column04'],
+                'constraints' : [{'pk' : ['column08', 'column03']}]
+            },
+            'model03' : {
+                'description' : 'Test Model #3',
+                # int, float, uuid, str, str, int, float, datetime
+                'columns' : ['column13', 'column11', 'column19', 'column17', 'column15', 'column10', 'column07', 'column04'],
+                'constraints' : [{'pk' : ['column19'], 'uq' : ['column13', 'column11', 'column10']}]
             }
         }
     }
