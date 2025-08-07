@@ -558,8 +558,6 @@ class Test_SchemaWrite_Database(unittest.TestCase):
         schema.description = 'Schema #2 for testing purposes'
 
         schema.write(self.settings)
-
-        pdb.set_trace()
     
     def tearDown(self):
         """Drop Libra schema definition tables and any information in them."""

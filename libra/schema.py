@@ -541,16 +541,41 @@ class DatabaseTransferStrategy(TransferStrategy):
         ))
 
         # ModelDescript
-        for model in schema.registry.models.keys():
+        for model, modeldict in schema.registry.models.items():
             session.add(ModelDescript(
                 model_name = model,
-                description = schema.registry.models[model].get('description', None),
+                description = modeldict.get('description', None),
                 schema_name = schema.name,
                 modauthor = settings.author,
                 loadauthor = settings.author
             ))
 
             # Do Columnassoc & ConstraintDescript here too?
+            for idx, column in enumerate(modeldict['columns']):
+                session.add(ColumnAssoc(
+                    model_name = model,
+                    column_name = column,
+                    column_position = idx,
+                    nullable = schema.registry.columns[column].get('nullable', None),
+                    autoincrement = schema.registry.columns[column].get('autoincrement', None),
+                    quote = schema.registry.columns[column].get('quote', None),
+                    onupdate = schema.registry.columns[column].get('onupdate', None),
+                    schema_name = schema.name,
+                    info = schema.registry.columns[column].get('info', None),
+                    modauthor = settings.author,
+                    loadauthor = settings.author
+                ))
+
+            for constraint in modeldict['constraints']:
+                contype, columns = list(constraint.keys())[0], list(constraint.values())[0]
+                session.add(ConstraintDescript(
+                    constraint_type = contype,
+                    columns = ", ".join(columns),
+                    model_name = model,
+                    schema_name = schema.name,
+                    modauthor = settings.author,
+                    loadauthor = settings.author
+                ))
         
         # ColumnDescript
         for column, coldict in schema.registry.columns.items():
@@ -564,8 +589,8 @@ class DatabaseTransferStrategy(TransferStrategy):
                 modauthor = settings.author,
                 loadauthor = settings.author
             ))
-
-        pdb.set_trace()
+            
+        session.commit()
 
 # ==============================================================================
 
