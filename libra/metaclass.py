@@ -213,7 +213,7 @@ class MetaClass(DeclarativeMeta):
         dct['values']      = _values
         dct['items']       = _items
         dct['to_dict']     = _to_dict
-
+        
         # Equal methods that compare on unique keys & all columns would be useful
 
         dct['_col_registry'] = {}
