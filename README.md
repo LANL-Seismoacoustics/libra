@@ -45,8 +45,7 @@ introduce custom methods to all models belonging to a schema.
 ### Getting Started
 1. If you have not installed `Libra` previously, you can install it with `pip` 
 via the the command `pip install libra`. If you have an earlier version and 
-would like to upgrade to the latest version of `Libra`, use `pip install 
-libra --upgrade`.
+would like to upgrade to the latest version of `Libra`, use `pip install libra --upgrade`.
 2. Confirm that `Libra` has installed/updated successfully by examining the 
 last few lines of the text displayed in the console.
 
