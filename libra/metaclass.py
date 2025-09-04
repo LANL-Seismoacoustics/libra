@@ -183,12 +183,14 @@ def _items(cls) ->  Iterator[tuple[str, Any]]:
 def _to_dict(cls) -> dict[str, Any]:
     return {k : v for k, v in cls.items()}
 
+def _get_infoval(cls, key : str, cols : list[str] | None = None) -> dict:
 
-# def _to_dict(cls) -> dict:
+    if not cols:
+        cols = [col.name for col in cls.__table__.columns]
+    
+    vals = [col.info.get(key, None) for col in cls.__table__.columns]
 
-#     keys = [c.name for c in cls.__table__.columns]
-
-#     return {k : getattr(cls, k) for k in keys}
+    return cols, vals
 
 # ==============================================================================
 
@@ -213,6 +215,7 @@ class MetaClass(DeclarativeMeta):
         dct['values']      = _values
         dct['items']       = _items
         dct['to_dict']     = _to_dict
+        dct['get_infoval'] = _get_infoval
         
         # Equal methods that compare on unique keys & all columns would be useful
 

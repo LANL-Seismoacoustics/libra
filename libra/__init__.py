@@ -6,6 +6,7 @@ Brady Spears
 # ==============================================================================
 
 from .schema import Schema
+from .metaclass import MetaClass
 from .util import (
     DatabaseSettings,
     DictionarySettings,

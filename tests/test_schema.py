@@ -341,7 +341,6 @@ class Test_SchemaDispatchStrategy(unittest.TestCase):
 
         return self.assertEqual(strategy, CustomTransferStrategy)
 
-
 # ==============================================================================
 # Classes to handle Schema Loading
 

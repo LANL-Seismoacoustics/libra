@@ -10,150 +10,140 @@ ORM instance to a string.
 # ==============================================================================
 
 from __future__ import annotations
-import pdb
-import csv
 from datetime import datetime
-from io import StringIO
-from typing import Any
+import re
 from typing import Self
+import pdb
 
-from sqlalchemy import DateTime
+import sqlalchemy
 
 # ==============================================================================
 
-class FlatFile:
+class FlatFileMixin:
     """
     Contains functionality to read or write a string to or from an ORM instance.
-
-    Methods
-    -------
-    from_string
-        Reads a 
-    to_string
     """
 
-    def from_string(self, line : str, delimiter : str = ' ', fixed_length : bool | None = None, dtime_format : str | None = None) -> Self:
+    def __new__(cls, *args, **kwargs) -> None:
         """
-        Construct a mapped table instance from a correctly-formatted flat file 
-        line. 
-
-        Parameters
-        ----------
-        line : str
-            Flat file line passed as a delimited string
-        delimiter : str, optional
-            Single character delimiter to join values of a model by. Default is
-            whitespace ' ' not contained in double quotes. (i.e. 'val1 val2 
-            val3 "My val4"' maps to ['val1', 'val2', 'val3', "My val4"])
-        fixed_length : bool, optional
-            Optional flag to force fixed-length formatting to be used or 
-            unused, which requires the info['format'] attribute to be defined 
-            for each column belonging to the ORM.
+        Extends the __new__() method up the MRO to add a _format_string property
+        to the child class.
         """
+        
+        cls._format_string = string_formatter(cls.__base__.metadata, [c.name for c in cls.__table__.columns])
 
-        return _from_string(self, line, delimiter, fixed_length, dtime_format)
-    
-    def to_string(cls, delimiter : str = ' ', fixed_length : bool | None = None) -> str:
+        return super().__new__(cls)
+
+    def to_string(cls) -> str:
         """
         """
 
-        return _to_string(cls, delimiter, fixed_length)
+        return _to_string(cls)
+
+    @classmethod
+    def from_string(cls, line : str, default_on_error : list[str] | None = None) -> Self:
+        """
+        """
+
+        return _from_string(cls, line, default_on_error)
 
 # ==============================================================================
 
-def _str(s : Any) -> str:
-    """If an input interpretted as a string has spaces, quote it"""
-
-    s = str(s)
-
-    if ' ' in s:
-        s = f'"{s}"'
-    
-    return s
-
-def _from_string(cls,
-    line : str, 
-    delimiter : str, 
-    fixed_length : bool | None,
-    dtime_format : str | None
-    ) -> Self:
+def string_formatter(meta : sqlalchemy.MetaData, structure : list[str]) -> str:
     """
-    Construct a mapped table instance from a correctly-formatted flat file 
-    line. 
+    Get a string substitution formatter for a given ORM instance. Columns 
+    belonging to the ORM instance must have the 'format' key defined within the 
+    Column object's 'info' dictionary. If not defined, string_formatter will 
+    return a string formatting 
 
     Parameters
     ----------
-    line : str
-        Flat file line passed as a delimited string
-    delimiter : str or None
-        Common delimiter to split 'line' at. Default is whitespace ' ' not 
-        contained in double quotes. (i.e. 'val1 val2 val3 "My val4"' maps 
-        to ['val1', 'val2', 'val3', "My val4"])
-    fixed_length : bool or None
-        Optional flag to force fixed-length formatting to be used or 
-        unused, which requires the ORM's info['format'] attribute to be 
-        defined.
-
-    Notes
-    -----
-    `from_string` will first consult each `Column` object attribute, looking 
-    for the 'format' keyword in the `Column's` 'info' dictionary. If found, 
-    'from_string' will automatically attempt to read the input string with 
-    fixed-length values as specified by the value associated with 'format'.
-    This behavior can be toggled with the 'fixed_length' input parameter.
+    meta : sqlalchemy.MetaData
+        SQLAlchemy MetaData object containing features of a database 
+    structure : list[str]
+        List of qualified column names within the MetaData object. Note: Columns
+        passed to structure must contain the 'format' keyword inside the 
+        Column's 'info' dictionary.
+    
+    Returns
+    -------
+    str
+        Returns substitution-formatted string in the case that each Column.info
+        dictionary's 'format' key is defined
     """
 
-    if not dtime_format:
-        dtime_format = '%Y-%m-%d %H:%M:%S'
+    tabledct = dict([(itable.name, itable) for itable in list(meta.tables.values())])
 
-    if fixed_length == True:
-        return NotImplementedError('Fixed Length support not implemented yet')
+    colfmtdct = {}
+    for t in list(meta.tables.values()):
+        for col in t.columns:
+            _format = col.info.get('format', None)
 
-    reader = csv.reader(StringIO(line), delimiter = delimiter)
-    values = next(reader)
+            colfmtdct[col.name] = _format
 
-    if len(values) != len(cls.__mapper__.columns):
-        raise ValueError(f'Value unpack mismatch (expected {len(cls)}, got {len(values)})')
+    structfmt = []
+    for idx, item in enumerate(structure):
+        if item in tabledct:
+            itabfmt = ' '.join(["{{{}.{}:{}}}".format(idx, c.name, c.info.get('format', ''))
+                for c in tabledct[item].columns])
+            structfmt.append(itabfmt)
+        elif item in colfmtdct:
+            # e.g. {0:format} {1:format}
+            structfmt.append("{{{}:{}}}".format(idx, colfmtdct[item]))
 
-    for key, val in zip(cls.keys(), values):
-        val = val.strip().strip('"') # Get rid of leading/trailing quotation marks and spaces
+    return ' '.join(structfmt) + '\n'
 
-        coltype = cls.__table__.columns[key].type
-        parse_func = coltype.python_type # Python type associated with the column
-        
-        try:
-            setattr(cls, key, parse_func(val)) # Works with standard types
-        except TypeError:
-            match coltype:
-                case DateTime():
-                    parse_func = lambda s : datetime.strptime(s, dtime_format) 
-                    setattr(cls, key, parse_func(val))
-                case _:
-                    return NotImplementedError
+def _from_string(cls : type[FlatFileMixin], line : str, default_on_error : list[str] | None = None) -> type[FlatFileMixin]:
+
+    results = []
+    cursor = 0
+
+    # regex to extract {index:specifier}
+    token_re = re.compile(r"\{(\d+):([^}]*)\}")
+
+    for match in token_re.finditer(cls._format_string):
+        _, spec = int(match.group(1)), match.group(2)
+
+        # Handle datetime separately (identified by having %Y, %m, etc.)
+        if "%" in spec:
+            width = len(datetime.now().strftime(spec))
+            raw = line[cursor:cursor+width]
+            cursor += width
+            results.append(datetime.strptime(raw.strip(), spec))
+            continue
+
+        # NOTE: Only datetime objects and strptime formatting are currently 
+        # supported in custom cases under Libra. It's possible that other 
+        # types with separate format identifiers exist. Examples would include 
+        # datetime.timedelta objects (SQLAlchemy equivalent is Interval object),
+        # pickle objects (SQLAlchemy equivalent is PickleType object), etc.
+
+        # Extract width and type
+        m = re.match(r"(\d+)(?:\.\d+)?([dfs])", spec)
+        if not m:
+            raise ValueError(f"Unsupported format spec: {spec}")
+        width, typ = int(m.group(1)), m.group(2)
+
+        raw = line[cursor:cursor+width]
+        cursor += width
+
+        # These do not include some native Python format identifiers - need to extend
+        if typ == "d":
+            results.append(int(raw.strip()))
+        elif typ == "f":
+            results.append(float(raw.strip()))
+        elif typ == "s":
+            results.append(raw.strip())
+        else:
+            results.append(raw.strip())
+
+        # Skip a space if it exists in the formatted string
+        if cursor < len(line) and line[cursor] == " ":
+            cursor += 1
     
-    return cls
+    return cls(*results)
 
-def _to_string(cls,
-    delimiter : str,
-    fixed_length : bool | None
-    ) -> str:
-    """
-    From a mapped table instance, output the model as a string.
-
-    Parameters
-        ----------
-        delimiter : str
-            Single character delimiter to join values of a model by
-        fixed_length : bool or None
-            Flag to force fixed-length formatting to be used or unused, which 
-            requires the ORM's info['format'] attribute to be defined. If 
-            True, the output string will be formatted according each column's 
-            specified format.
-    """
-    
-    if fixed_length == True:
-        return NotImplementedError('Fixed Length support not implemented yet')
-    
-    return delimiter.join([_str(v) for v in cls.values()]) + '\n'
+def _to_string(cls : type[FlatFileMixin]) -> str:
+    return cls._format_string.format(*cls)
 
 # ==============================================================================
