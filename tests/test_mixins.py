@@ -15,19 +15,19 @@ from sqlalchemy import DateTime, Float, Integer, String
 from libra import Schema
 from libra.mixins.flatfile import string_formatter
 from libra.func import (
-    from_string, to_string, to_dframe, simple_qc
+    from_string, to_string, to_dframe
 )
 
 # ==============================================================================
 # Test Model Instance added to a Schema
 
-schema = Schema('FlatFile Test Schema')
+schema = Schema('Mixin Test Schema')
 
 @schema.add_model
 class mymodel01:
-    column01 = Column(Integer, info = {'format' : '9d'})
-    column02 = Column(Float(precision = 53), info = {'format' : '17.5f'})
-    column03 = Column(String(12), info = {'format' : '15.15s'})
+    column01 = Column(Integer, info = {'format' : '9d', 'ge' : 1})
+    column02 = Column(Float(precision = 53), info = {'format' : '17.5f', 'gt' : 0., 'le' : 9999999999.999})
+    column03 = Column(String(12), info = {'format' : '15.15s', 'regex' : r'[a-z ]+$'})
     column04 = Column(DateTime, info = {'format' : '%Y-%m-%d %H:%M:%S'})
 
     pk = ['column01']
@@ -296,10 +296,14 @@ class Test_QC(TestSuper, unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-    def test_qc_initialization(self):
+    def test_simple_qc_single_orm(self):
+        """Test simple_qc() method on single ORM instance"""
+
         mod1 = MyModel01(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
 
-        simple_qc([mod1], schema)
+        qc_result = mod1.simple_qc()
+
+        pdb.set_trace()
     
     def tearDown(self):
         super().tearDown()

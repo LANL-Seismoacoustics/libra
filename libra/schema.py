@@ -38,7 +38,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from libra.metaclass import MetaClass
 from libra.registry import Registry
 from libra.mixins import (
-    FlatFileMixin
+    FlatFileMixin, QCMixin
 )
 from libra.util import TypeMap
 from libra.util.settings import _SchemaSettings
@@ -77,7 +77,7 @@ class Schema:
             description : str | None = None,
             metaclass : type[DeclarativeMeta] = MetaClass,
             typemap : TypeMap = TypeMap(),
-            mixins : tuple[type[DeclarativeMeta]] | None = (FlatFileMixin, ),
+            mixins : tuple[type[DeclarativeMeta]] | None = (FlatFileMixin, QCMixin, ),
         ) -> None:
         """
         Constructs a new `Schema` object.

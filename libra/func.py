@@ -11,21 +11,18 @@ methods added to ORM instances through Mixin classes.
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import pdb
-from abc import ABC, abstractmethod
+
 if TYPE_CHECKING:
     import pandas as pd
 
-import sqlalchemy
-
-from libra import Schema
 from libra import MetaClass
+from libra.mixins.qcmixin import QCResult
 
 # ==============================================================================
-# Quality Control Support Classes
-# TODO: This may need some additional thought
+# QC Support
 
-def simple_qc(orms : type[MetaClass]) -> None:
-    pass
+def simple_qc(orms : list[type[MetaClass]]) -> QCResult:
+    return [orm.simple_qc() for orm in orms]
 
 # ==============================================================================
 # Pandas DataFrame Support

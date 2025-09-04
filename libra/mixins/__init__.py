@@ -9,4 +9,5 @@ contained in each Mixin class.
 """
 
 from .flatfile import FlatFileMixin
+from .qcmixin import QCMixin
 
