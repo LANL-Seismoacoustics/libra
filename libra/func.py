@@ -10,7 +10,6 @@ methods added to ORM instances through Mixin classes.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import pdb
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -21,7 +20,25 @@ from libra.mixins.qcmixin import QCResult
 # ==============================================================================
 # QC Support
 
-def simple_qc(orms : list[type[MetaClass]]) -> QCResult:
+def simple_qc(orms : list[type[MetaClass]]) -> list[QCResult]:
+    """
+    Function to call the simple_qc() method for each ORM instance in a list.
+
+    Parameters
+    ----------
+    orms : list[type[MetaClass]]
+        List of object-relation-mapped instances, extended by the 
+        libra.mixin.QCMixin class.
+    
+    Returns
+    -------
+    list[QCResult]
+        List of QCResult objects, which themselves contain information on 
+        the checks performed on each column belonging to the ORM and whether 
+        each of those checks was passed, given the values contained in the ORM
+        instance.
+    """
+
     return [orm.simple_qc() for orm in orms]
 
 # ==============================================================================
@@ -81,7 +98,9 @@ def from_dframe(dframe : pd.DataFrame, model : type[MetaClass]) -> list[type[Met
         entry in the list per row of the DataFrame.
     """
 
-    pdb.set_trace()
+    rows = dframe.to_records(index = False)
+
+    return [model(*row) for row in rows]
 
 # ==============================================================================
 # FlatFile read/write Support

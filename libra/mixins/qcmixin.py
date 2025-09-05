@@ -12,9 +12,8 @@ contained in that structure.
 
 from __future__ import annotations
 import re
-from typing import Any, Callable
+from typing import Callable
 from functools import partial
-import pdb
 
 from sqlalchemy.sql.base import ReadOnlyColumnCollection
 
@@ -33,10 +32,34 @@ DEFAULT_CHECKS = {
 # ==============================================================================
 
 class QCResult:
-    def __init__(self):
+    """
+    Class to contain the result of a simple_qc() output.
+
+    Attributes
+    ----------
+    result : dict[str, list[dict[str, Any]]]
+        Dictionary mapping a key to a Callable and a boolean result.
+    
+    Methods
+    -------
+    add_result(self, key : str, func : Callable, result : bool) -> None:
+        Appends the result attribute to associate a key with a function and 
+        the boolean result of the execution of that function.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes a QCResult object with an empty result.
+        """
+
         self.result = {}
     
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        Returns a formatted string detailing the key, check, and result (PASS/
+        FAIL) of the execution of a check.
+        """
+
         lines = []
         for key, checks in self.result.items():
             if not checks:
@@ -51,7 +74,22 @@ class QCResult:
         return "\n".join(lines)
 
     def add_result(self, key : str, func : Callable, result : bool) -> None:
+        """
+        Appends the result attribute to associate a key with a function and 
+        the boolean result of the execution of that function.
+        
+        Parameters
+        ----------
+        key : str
+            Key to associate a check and result with.
+        func : Callable
+            Function that was executed.
+        result : bool
+            Boolean result of executing that function.
+        """
+
         entry = {'check' : func, 'result' : result}
+
         self.result.setdefault(key, []).append(entry)
 
 # ==============================================================================
@@ -59,13 +97,30 @@ class QCResult:
 class QCMixin:
     """
     Contains functionality to perform quality control (QC) on values contained 
-    within an ORM instance. 
+    within an ORM instance.
+
+    Attributes
+    ----------
+    _checks : dict[str, Callable]
+        Dictionary mapping specific keywords to specific functions. When 
+        iterating through an ORM's columns, any reference to the key inside the 
+        Column object's 'info' dictionary will map to the function defined here.
+    _qc_struct : dict[str, list[Callable]]
+        Dictionary mapping column names to a list of functions. When calling the 
+        simple_qc() method, this variable will determine the quality control 
+        checks to be performed on each column.
+    
+    Methods
+    -------
+    simple_qc(cls) -> QCResult
+        Iterates through each column in the input class and performs any checks 
+        associated with that column on the value associated with that column. 
     """
 
     def __new__(cls, *args, **kwargs) -> None:
         """
-        Extend the __new__() method up the MRO to add a 'qc' property to the 
-        child class.
+        Extend the __new__() method up the MRO to add quality control properties 
+        to the inheriting class.
         """
 
         cls._checks = DEFAULT_CHECKS
@@ -74,6 +129,16 @@ class QCMixin:
         return super().__new__(cls)
 
     def simple_qc(cls) -> QCResult:
+        """
+        Iterates through each column in the input class and performs any checks 
+        associated with that column on the value associated with that column.
+
+        Parameters
+        ----------
+        cls : type[QCMixin]
+            Class inheriting from QCMixin. Should have "_checks" attribute and 
+            "_qc_struct" attribute defined.
+        """
 
         _qc_result = QCResult()
         for key, val in cls.items():
@@ -84,7 +149,27 @@ class QCMixin:
 
 # ==============================================================================
 
-def create_qc_lambdas(columns : ReadOnlyColumnCollection, checks : dict[str, Callable]) -> dict[str, Callable]:
+def create_qc_lambdas(columns : ReadOnlyColumnCollection, checks : dict[str, Callable]) -> dict[str, list[Callable]]:
+    """
+    Create a dictionary mapping a Column object to a series of checks, based on 
+    the keys contained in the Column object's 'info' dictionary. If a key in the 
+    'info' dictionary is recognized as a key in input 'checks', the mapped 
+    Callable will be stored in a 'qc_struct' dictionary.
+
+    Parameters
+    ----------
+    columns : sqlalchemy.sql.base.ReadOnlyColumnCollection
+        Iterable containing SQLAlchemy Column objects.
+    checks : dict[str, Callable]
+        Dictionary mapping specific keys contained in a Columnn's 'info' 
+        dictionary to a Callable, like a lambda function.
+    
+    Returns
+    -------
+    qc_struct : dict[str, list[Callable]]
+        A dictionary mapping a column to a list of Callables or "checks" that 
+        return boolean values.
+    """
 
     qc_struct = {}
     for column in columns:

@@ -2,8 +2,7 @@
 
 import os
 import unittest
-import pdb
-from datetime import datetime, timezone
+from datetime import datetime
 
 import pandas as pd
 from pandas.testing import assert_frame_equal
@@ -15,7 +14,7 @@ from sqlalchemy import DateTime, Float, Integer, String
 from libra import Schema
 from libra.mixins.flatfile import string_formatter
 from libra.func import (
-    from_string, to_string, to_dframe
+    from_string, to_string, to_dframe, from_dframe, simple_qc
 )
 
 # ==============================================================================
@@ -34,9 +33,9 @@ class mymodel01:
 
 @schema.add_model
 class mymodel02:
-    column05 = Column(Integer, info = {'format' : '9d'})
-    column06 = Column(Float(precision = 53), info = {'format' : '17.5f'})
-    column07 = Column(String(12)) # Column07 formatted as '{2:None}'
+    column05 = Column(Integer, info = {'format' : '9d', 'le' : 0})
+    column06 = Column(Float(precision = 53), info = {'format' : '17.5f', 'gt' : 1000.0, 'le' : 9999999999.999})
+    column07 = Column(String(12), info = {'regex' : r'[A-Z ]+$'})
     column08 = Column(DateTime, info = {'format' : '%Y-%m-%d %H:%M:%S'})
 
     pk = ['column05']
@@ -284,6 +283,26 @@ class Test_FromDataFrame(TestSuper, unittest.TestCase):
     def setUp(self):
         super().setUp()
     
+    def test_fromdframe(self):
+        """Test from_dframe() on a Pandas DataFrame"""
+
+        dframe = pd.DataFrame(
+            data = [
+                [1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10)],
+                [2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)],
+                [3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)],
+                [4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)]
+            ],
+            columns = ['column01', 'column02', 'column03', 'column04']
+        )
+
+        mod = from_dframe(dframe, MyModel01)
+        
+        self.assertEqual(mod[0], MyModel01(1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 11)))
+        self.assertEqual(mod[1], MyModel01(2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)))
+        self.assertEqual(mod[2], MyModel01(3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)))
+        self.assertEqual(mod[3], MyModel01(4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)))
+
     def tearDown(self):
         super().tearDown()
 
@@ -296,15 +315,56 @@ class Test_QC(TestSuper, unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-    def test_simple_qc_single_orm(self):
-        """Test simple_qc() method on single ORM instance"""
+    def test_simple_qc_single_orm_all_true(self):
+        """Test simple_qc() on single ORM where all checks return True"""
 
         mod1 = MyModel01(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
 
         qc_result = mod1.simple_qc()
-
-        pdb.set_trace()
+        
+        self.assertTrue(qc_result.result['column01'][0]['result'])
+        self.assertTrue(qc_result.result['column02'][0]['result'])
+        self.assertTrue(qc_result.result['column02'][1]['result'])
+        self.assertTrue(qc_result.result['column03'][0]['result'])
     
+    def test_simple_qc_single_orm_some_true(self):
+        """Test simple_qc() on single ORM where some checks return False"""
+
+        mod1 = MyModel01(0, -1000.0, 'Testing', datetime(2025, 10, 31, 12, 15, 00))
+
+        qc_result = mod1.simple_qc()
+
+        self.assertFalse(qc_result.result['column01'][0]['result'])
+        self.assertFalse(qc_result.result['column02'][0]['result'])
+        self.assertTrue(qc_result.result['column02'][1]['result'])
+        self.assertFalse(qc_result.result['column03'][0]['result'])
+    
+    def test_simple_qc_multiple_orms_all_true(self):
+        """Test simple_qc() on multiple orms that produce all True results"""
+
+        mod = self.session.query(MyModel01).all()
+
+        qc_result = simple_qc(mod)
+
+        for entry in qc_result:
+            self.assertTrue(entry.result['column01'][0]['result'])
+            self.assertTrue(entry.result['column02'][0]['result'])
+            self.assertTrue(entry.result['column02'][1]['result'])
+            self.assertTrue(entry.result['column03'][0]['result'])
+
+    def test_simple_qc_multiple_orms_some_false(self):
+        """Test simple_qc() on multiple orms that produce some False results"""
+
+        mod = self.session.query(MyModel02).all()
+
+        qc_result = simple_qc(mod)
+
+        for entry in qc_result:
+            self.assertFalse(entry.result['column05'][0]['result'])
+            self.assertFalse(entry.result['column06'][0]['result'])
+            self.assertTrue(entry.result['column06'][1]['result'])
+            self.assertFalse(entry.result['column07'][0]['result'])
+
     def tearDown(self):
         super().tearDown()
 
