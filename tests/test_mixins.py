@@ -40,8 +40,18 @@ class mymodel02:
 
     pk = ['column05']
 
+@schema.add_model
+class mymodel03:
+    column09 = Column(Integer, info = {})
+    column10 = Column(Float(precision = 53), info = {})
+    column11 = Column(String(12), info = {})
+    column12 = Column(DateTime, info = {})
+
+    pk = ['column09']
+
 class MyModel01(schema.mymodel01): __tablename__ = 'Test_MyModel01'
 class MyModel02(schema.mymodel02): __tablename__ = 'Test_MyModel02'
+class MyModel03(schema.mymodel03): __tablename__ = 'Test_MyModel03'
 # ==============================================================================
 
 class TestSuper:

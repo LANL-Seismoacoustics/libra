@@ -24,7 +24,12 @@ DEFAULT_CHECKS = {
     'lt' : lambda val, ref : val < ref,
     'ge' : lambda val, ref : val >= ref,
     'le' : lambda val, ref : val <= ref,
+    'equal' : lambda val, ref : val == ref,
+    'nequal' : lambda val, ref : val != ref,
+    'range_ex' : lambda val, ref : val > ref[0] and val < ref[1],
+    'range_in' : lambda val, ref : val >= ref[0] and val <= ref[1],
     'regex' : lambda val, ref : bool(re.fullmatch(ref, val)),
+    'options' : lambda val, ref : val in ref,
     'min_length' : lambda val, ref : len(val) >= ref,
     'max_length' : lambda val, ref : len(val) <= ref
 }
@@ -71,7 +76,7 @@ class QCResult:
                 check_name = entry["check"]
                 result = "PASS" if entry["result"] else "FAIL"
                 lines.append(f"  - {check_name}: {result}")
-        return "\n".join(lines)
+        return "\n".join(lines) + "\n"
 
     def add_result(self, key : str, func : Callable, result : bool) -> None:
         """
