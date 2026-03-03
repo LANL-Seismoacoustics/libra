@@ -1,0 +1,1131 @@
+NNSA KB Core :
+  description : National Nuclear Security Administration (NNSA) Knowledge Base (KB) Core relational database table schema
+  columns :
+    algorithm :
+      type : String(length = 15)
+      default : '-'
+      info : 
+        format : 15.15s
+        width : 15
+        max_length : 15
+    amp :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 11.2f
+        width : 11
+        gt : 0
+    ampid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    amptime :
+      type : Float(precision = 53)
+      default : -9999999999.999
+      info : 
+        format : 17.5f
+        width : 17
+        ge : -9999999999.999
+    amptype :
+      type : String(length = 8)
+      default : '-'
+      info :
+        format : 8.8s
+        width : 8
+        max_length : 8
+    arid :
+      type : Numeric(9)
+      default : -1
+      info : 
+        format : 9d
+        width : 9
+        gt : 0
+    auth :
+      type : String(length = 20)
+      default : '-'
+      info :
+        format : 20.20s
+        width : 20
+        max_length : 20
+    azdef :
+      type : String(length = 1)
+      default : '-'
+      info : 
+        format : 1.1s
+        width : 1
+        max_length : 1
+    azimuth :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        lt : 360
+    azres :
+      type : Float(precision = 24)
+      default : -999
+      info : 
+        format : 7.1f
+        width : 7
+        ge : -180
+        le : 180
+    band :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+    belief :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 4.2f
+        width : 4
+        le : 1
+        ge : 0
+    calib :
+      type : Float(precision = 24)
+      default : 1
+      info : 
+        format : 16.6f 
+        width : 16
+        gt : 0
+    calper :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 16.6f
+        width : 16
+        gt : 0
+    calratio :
+      type : Float(precision = 24)
+      default : 1
+      info :
+        format : 16.6f
+        width : 16
+        gt : 0
+    chan :
+      type : String(length = 8)
+      default : '-'
+      info :
+        format : 8.8s
+        width : 8
+        regex : r"^[\w\-\.\*]+$"
+        max_length : 8
+    chanid : 
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        gt : 0
+    clip : 
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    commid : 
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    conf : 
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 5.2f
+        width : 5
+        ge : 0.5
+        le : 1
+    ctype :
+      type : String(length = 4)
+      default : '-'
+      info :
+        format : 4.4s
+        width : 4
+        max_length : 4
+    datatype :
+      type : String(length = 2)
+      default : '-'
+      info :
+        format : 2.2s
+        width : 2
+        max_length : 2
+    deast :
+      type : Float(precision = 24)
+      default : -99999
+      info :
+        format : 9.4f
+        width : 9
+        ge : -20000
+        le : 20000
+    delaz :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        le : 180
+    delslo : 
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        lt : 400
+    delta : 
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 8.3f
+        width : 8
+        ge : 0
+        lt : 1800
+    deltaf :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.3f
+        width : 7
+        gt : 0
+    deltim :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 6.3f
+        width : 6
+        gt : 0
+        lt : 3600
+    depdp : 
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 9.4f
+        width : 9
+        ge : 0
+        le : 750
+    depth :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 9.4f
+        width : 9
+        ge : -100
+        le : 750
+    descrip :
+      type : String(length = 50)
+      default : '-'
+      info : 
+        format : 50.50s
+        width : 50
+        max_length : 50
+    dfile :
+      type : String(length = 32)
+      default : '-'
+      info :
+        format : 32.32s
+        width : 32
+        max_length : 32
+    digital :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    dir :
+      type : String(length = 64)
+      default : '-'
+      info :
+        format : 64.64s
+        width : 64
+        max_length : 64
+    dnorth : 
+      type : Float(precision = 24)
+      default : -99999
+      info :
+        format : 9.4f
+        width : 9
+        ge : -20000
+        le : 20000
+    dtype :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    duration :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        gt : 0
+    edepth :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 9.4f
+        width : 9
+        ge : 0
+        lt : 10
+    elev :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 9.4f
+        width : 9
+        le : -10
+        ge : 10
+    ema :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        le : 90
+    emares :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.1f
+        width : 7
+        ge : -90
+        le : 90
+    endtime :
+      type : Float(precision = 53)
+      default : 9999999999.999
+      info :
+        format : 17.5f
+        width : 17
+        gt : -9999999999.999
+        lt : 9999999999.999
+    esaz :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        lt : 360
+    etype :
+      type : String(length = 7)
+      default : '-'
+      info :
+        format : 7.7s
+        width : 7
+        max_length : 7
+    evid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    evname :
+      type : String(length = 32)
+      default : '-'
+      info :
+        format : 32.32s
+        width : 32
+        max_length : 32
+    fm :
+      type : String(length = 2)
+      default : '-'
+      info :
+        format : 2.2s
+        width : 2
+        max_length : 2
+    foff :
+      type : Numeric(10)
+      default : -1
+      info :
+        format : 10d
+        width : 10
+        ge : 0
+        lt : 100000000000
+    grn :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        ge : 1
+        le : 757
+    grname :
+      type : String(length = 40)
+      default : '-'
+      info :
+        format : 40.40s
+        width : 40
+        max_length : 40
+    hang :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 6.1f
+        width : 6
+        ge : 0
+        le : 360
+    inarrival :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    inid :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        gt : 0
+    insname :
+      type : String(length = 50)
+      default : '-'
+      info :
+        format : 50.50s
+        width : 50
+        max_length : 50
+    instant :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    instype :
+      type : String(length = 6)
+      default : '-'
+      info :
+        format : 6.6s
+        width : 6
+        max_length : 6
+    iphase :
+      type : String(length = 8)
+      default : '-'
+      info :
+        format : 8.8s
+        width : 8
+        max_length : 8
+    jdate :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+    keyname : 
+      type : String(length = 15)
+      default : '-'
+      info :
+        format : 15.15s
+        width : 15
+        max_length : 15
+    keyvalue :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    lat :
+      type : Float(precision = 53)
+      default : -999
+      info :
+        format : 11.6f
+        width : 11
+        ge : -90
+        le : 90
+    lddate :
+      type : DateTime()
+      default : {'$ref' : 'datetime.now'}
+      onupdate : {'$ref' : 'datetime.now'}
+      info :
+        format : '%y-%m-%d %H:%M:%S'
+        width : 17
+    lineno :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        gt : 0
+        lt : 1000
+    logat :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -4
+    lon :
+      type : Float(precision = 53)
+      default : -999
+      info :
+        format : 11.6f
+        width : 11
+        ge : -180
+        le : 180
+    magdef :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    magid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    magnitude :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -5
+        lt : 10
+    magres :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -4
+        lt : 4
+    magtype :
+      type : String(length = 6)
+      default : '-'
+      info :
+        format : 6.6s
+        width : 6
+        max_length : 6
+    mb :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -5
+        lt : 10
+    mbid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    ml :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -5
+        lt : 10
+    mlid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    mmodel :
+      type : String(length = 15)
+      default : '-'
+      info :
+        format : 15.15s
+        width : 15
+        max_length : 15
+    ms : 
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -5
+        lt : 10
+    msid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    nass :
+      type : Numeric(4)
+      default : -1
+      info :
+        format : 4d
+        width : 4
+        gt : 0
+        lt : 10000
+    ncalib :
+      type : Float(precision = 24)
+      default : 1
+      info :
+        format : 16.6f
+        width : 16
+        ne : 0
+    ncalper :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 16.6f
+        width : 16
+        gt : .000001
+        lt : 3600
+    ndef :
+      type : Numeric(4)
+      default : -1
+      info :
+        format : 4d
+        width : 4
+        gt : 0
+        lt : 10000
+    ndp :
+      type : Numeric(4)
+      default : -1
+      info :
+        format : 4d
+        width : 4
+        ge : 0
+        lt : 10000
+    net :
+      type : String(length = 8)
+      default : '-'
+      info :
+        format : 8.8s
+        width : 8
+        regex : r"^[A-Z0-9][A-Z0-9:\-\+_]*$"
+        max_length : 8
+    netname :
+      type : String(length = 80)
+      default : '-'
+      info :
+        format : 80.80s
+        width : 80
+        max_length : 80
+    nettype :
+      type : String(length = 4)
+      default : '-'
+      info :
+        format : 4.4s
+        width : 4
+        max_length : 4
+    nsamp :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        gt : 0
+        lt : 100000000
+    nsta :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        max_length : 8
+    offdate :
+      type : Numeric(8)
+      default : 2286324
+      info :
+        format : 8d
+        width : 8
+    ondate :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+    orid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    parid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    per :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        gt : 0
+        lt : 3600
+    phase :
+      type : String(length = 8)
+      default : '-'
+      info :
+        format : 8.8s
+        width : 8
+        max_length : 8
+    prefor :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    qual :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    rect :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.3f
+        width : 7
+        ge : 0
+        le : 1
+    refsta :
+      type : String(length = 6)
+      default : '-'
+      info :
+        format : 6.6s
+        width : 6
+        regex : r"^[A-Z0-9\-][A-Z0-9x\-\*+]+$"
+        max_length : 6
+    remark :
+      type : String(length = 80)
+      default : '-'
+      info :
+        format : 80.80s
+        width : 80
+        max_length : 80
+    rsptype :
+      type : String(length = 6)
+      default : '-'
+      info :
+        format : 6.6s
+        width : 6
+        max_length : 6
+    samprate :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 11.7f
+        width : 11
+        gt : .001
+        lt : 100000
+    sdepth :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 9.4f
+        width : 9
+        ge : 0
+        lt : 750
+    sdobs :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 9.4f
+        width : 9
+        ge : 0
+    seaz :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        lt : 360
+    segtype : 
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    slodef :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    slores : 
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 7.2f
+        width : 7
+        gt : -400
+        lt : 400
+    slow :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        lt : 400
+    smajax :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 9.4f
+        width : 9
+        ge : 0
+        lt : 20000
+    sminax :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 9.4f
+        width : 9
+        ge : 0
+        lt : 20000
+    snr : 
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 10.2f
+        width : 10
+        gt : 0
+    srn :
+      type : Numeric(8)
+      default : -1
+      info :
+        format : 8d
+        width : 8
+        ge : 1
+        le : 50
+    srname :
+      type : String(length = 4)
+      default : '-'
+      info :
+        format : 40.40s
+        width : 40
+        max_length : 40
+    sta :
+      type : String(length = 6)
+      default : '-'
+      info :
+        format : 6.6s
+        width : 6
+        regex : r"^[A-Z0-9\-][A-Z0-9x\-\*+]+$"
+        max_length : 6
+    staname :
+      type : String(length = 50)
+      default : '-'
+      info :
+        format : 50.50s
+        width : 50
+        max_length : 50
+    stassid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    statype :
+      type : String(length = 4)
+      default : '-'
+      info :
+        format : 4.4s
+        width : 4
+        max_length : 4
+    stime :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 6.3f
+        width : 6
+        ge : 0
+        lt : 3600
+    strike :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 6.2f
+        width : 6
+        ge : 0
+        lt : 360
+    stt :
+      type : Float(precision = 24)
+      default : -100000000
+      info : 
+        format : 15.4f
+        width : 156
+        ge : 0
+    stx :
+      type : Float(precision = 24)
+      default : -100000000
+      info : 
+        format : 15.4f
+        width : 156
+        ge : -999
+    sty :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : -999
+    stype :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    stz :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : -999
+    sxx :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : 0
+    sxy :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : -999
+    sxz :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : -999
+    syy :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : 0
+    syz :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : -999
+    szz :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 15.4f
+        width : 15
+        ge : 0
+    tagid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9d
+        width : 9
+        gt : 0
+    tagname :
+      type : String(8)
+      default : '-'
+      info :
+        format : 8.8s
+        width : 8
+        max_length : 8
+    time : 
+      type : Float(precision = 53)
+      default : -9999999999.999
+      info :
+        format : 17.5f
+        width : 17
+        gt : -9999999999.999
+    timedef :
+      type : String(length = 1)
+      default : '-'
+      info :
+        format : 1.1s
+        width : 1
+        max_length : 1
+    timeres :
+      type : Float(precision = 24)
+      default : -999
+      info :
+        format : 8.3f
+        width : 8
+        gt : -999
+    tshift :
+      type : Float(precision = 24)
+      default : -100000000
+      info :
+        format : 16.2f
+        width : 16
+        gt : -999
+        lt : 999
+    uncertainty :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 7.2f
+        width : 7
+        ge : 0
+        le : 2
+    units :
+      type : String(length = 15)
+      default : '-'
+      info :
+        format : 15.15s
+        width : 15
+        max_length : 15
+    vang :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 6.1f
+        width : 6
+        ge : 0
+        le : 180
+    vmodel :
+      type : String(length = 15)
+      default : '-'
+      info :
+        format : 15.15s
+        width : 15
+        max_length : 15
+    wfid :
+      type : Numeric(9)
+      default : -1
+      info :
+        format : 9.9s
+        width : 9
+        gt : 0
+    wgt :
+      type : Float(precision = 24)
+      default : -1
+      info :
+        format : 6.3f
+        width : 6
+        gt : 0
+        lt : 1000
+
+  models :
+    affiliation :
+      columns : [net, sta, time, endtime, lddate]
+      constraints : 
+        - pk : {columns : [net, sta, time]}
+    amplitude :
+      columns : [ampid, arid, parid, chan, amp, per, snr, amptime, time, duration, deltaf, amptype, units, clip, inarrival, auth, lddate]
+      constraints :
+        - pk : {columns : [ampid]}
+        - uq : {columns : [amptime, amptype, arid, auth, chan, deltaf, duration, parid, per, time]}
+    arrival :
+      columns : [sta, time, arid, jdate, stassid, chanid, chan, iphase, stype, deltim, azimuth, delaz, slow, delslo, ema, rect, amp, per, logat, clip, fm, snr, qual, auth, commid, lddate]
+      constraints :
+        - pk : {columns : [arid]}
+        - uq : {columns : [auth, chan, iphase, sta, time]}
+    assoc :
+      columns : [arid, orid, sta, phase, belief, delta, seaz, esaz, timeres, timedef, azres, azdef, slores, slodef, emares, wgt, vmodel, commid, lddate]
+      constraints :
+        - pk : {columns : [arid, orid]}
+    event :
+      columns : [evid, evname, prefor, auth, commid, lddate]
+      constraints :
+        - pk : {columns : [evid]}
+        - uq : {columns : [prefor]}
+    gregion :
+      columns : [grn, grname, lddate]
+      constraints :
+        - pk : {columns : [grn]}
+    instrument :
+      columns : [inid, insname, instype, band, digital, samprate, ncalib, ncalper, dir, dfile, rsptype, lddate]
+      constraints :
+        - pk : {columns : [inid]}
+        - uq : {columns : [dfile, dir, instype, ncalib, samprate]}
+    lastid :
+      columns : [keyname, keyvalue, lddate]
+      constraints :
+        - pk : {columns : [keyname]}
+    netmag :
+      columns : [magid, net, orid, evid, magtype, nsta, magnitude, uncertainty, auth, commid, lddate]
+      constraints :
+        - pk : {columns : [magid]}
+        - uq : {columns : [auth, magtype, orid]}
+    network :
+      columns : [net, netname, nettype, auth, commid, lddate]
+      constraints :
+        - pk : {columns : [net]}
+        - uq : {columns : [auth, netname]}
+    origerr :
+      columns : [orid, sxx, syy, szz, stt, sxy, sxz, syz, stx, sty, stz, sdobs, smajax, sminax, strike, sdepth, stime, conf, commid, lddate]
+      constraints :
+        - pk : {columns : [orid]}
+    origin :
+      columns : [lat, lon, depth, time, orid, evid, jdate, nass, ndef, ndp, grn, srn, etype, depdp, dtype, mb, mbid, ms, msid, ml, mlid, algorithm, auth, commid, lddate]
+      constraints :
+        - pk : {columns : [orid]}
+        - uq : {columns : [auth, depth, lat, lon, time]}
+    remark :
+      columns : [commid, lineno, remark, lddate]
+      constraints :
+        - pk : {columns : [commid, lineno]}
+    sensor :
+      columns : [sta, chan, time, endtime, inid, chanid, jdate, calratio, calper, tshift, instant, lddate]
+      constraints :
+        - pk : {columns : [chan, sta, time]}
+    site :
+      columns : [sta, ondate, offdate, lat, lon, elev, staname, statype, refsta, dnorth, deast, lddate]
+      constraints :
+        - pk : {columns : [ondate, sta]}
+    sitechan :
+      columns : [sta, chan, ondate, chanid, offdate, ctype, edepth, hang, vang, descrip, lddate]
+      constraints :
+        - pk : {columns : [chanid]}
+        - uq : {columns : [chan, ondate, sta]}
+    sregion :
+      columns : [srn, srname, lddate]
+      constraints :
+        - pk : {columns : [srn]}
+    stamag :
+      columns : [magid, ampid, sta, arid, orid, evid, phase, delta, magtype, magnitude, uncertainty, magres, magdef, mmodel, auth, commid, lddate]
+      constraints :
+        - pk : {columns : [ampid, arid, auth, magid, phase, sta]}
+    wfdisc :
+      columns : [sta, chan, time, wfid, chanid, jdate, endtime, nsamp, samprate, calib, calper, instype, segtype, datatype, clip, dir, dfile, foff, commid, lddate]
+      constraints :
+        - pk : {columns : [wfid]}
+        - uq : {columns : [chan, sta, time]}
+    wftag :
+      columns : [tagname, tagid, wfid, lddate]
+      constraints :
+        - pk : {columns : [tagid, tagname, wfid]}

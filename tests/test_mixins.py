@@ -1,384 +1,368 @@
+'''
+Brady Spears, Los Alamos National Laboratory
+10/7/2025
+
+Test Suite for all built-in Libra Mixin classes.
+'''
+
 # ==============================================================================
 
 import os
 import unittest
-from datetime import datetime
+import datetime
 
+import sqlalchemy
 import pandas as pd
-from pandas.testing import assert_frame_equal
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy import Column
-from sqlalchemy import DateTime, Float, Integer, String
+from rich.table import Table
 
-from libra import Schema
-from libra.mixins.flatfile import string_formatter
-from libra.func import (
-    from_string, to_string, to_dframe, from_dframe, simple_qc
-)
+from libra.schema import Schema
 
 # ==============================================================================
-# Test Model Instance added to a Schema
 
-schema = Schema('Mixin Test Schema')
+TEST_SCHEMA = {
+    'Test Schema' : {
+        'columns': {
+            'id': {
+                'type': 'Integer()',
+                'nullable': False,
+                'default' : -1,
+                'info': {'width': 5, 'format' : '5d', 'ge' : 0}
+            },
+            'name': {
+                'type': 'String(length = 20)',
+                'nullable': False,
+                'info': {'format': '20.20s', 'width' : 20, 'regex' : "^[A-Z][a-z]*$"}
+            },
+            'score': {
+                'type': 'Float()',
+                'nullable': True,
+                'info': {'width': 8, 'format': '8.2f', 'ge' : 0., 'le' : 100.}
+            },
+            'class_name' : {
+                'type' : 'String(length = 20)',
+                'nullable' : False,
+                'info' : {'format' : '20.20s', 'width' : 20}
+            },
+            'created': {
+                'type': 'DateTime()',
+                'nullable': False,
+                'default' : {'$ref' : 'datetime.now'},
+                'info': {'format': '%Y-%m-%d', 'width' : 10}
+            }
+        },
 
-@schema.add_model
-class mymodel01:
-    column01 = Column(Integer, info = {'format' : '9d', 'ge' : 1})
-    column02 = Column(Float(precision = 53), info = {'format' : '17.5f', 'gt' : 0., 'le' : 9999999999.999})
-    column03 = Column(String(12), info = {'format' : '15.15s', 'regex' : r'[a-z ]+$'})
-    column04 = Column(DateTime, info = {'format' : '%Y-%m-%d %H:%M:%S'})
+        'models': {
+            'record': {
+                'columns': ['id', 'name', 'score', 'created'],
+                'constraints': [
+                    {'pk' : {'columns' : ['id']}},
+                    {'uq' : {'columns' : ['name']}}
+                ]
+            },
+            'class' : {
+                'columns' : ['id', 'name', 'class_name', 'created'],
+                'constraints' : [
+                    {'pk' : {'columns' : ['id']}},
+                    {'uq' : {'columns' : ['name', 'class_name']}}
+                ]
+            }
+        }
+    }
+}
 
-    pk = ['column01']
-
-@schema.add_model
-class mymodel02:
-    column05 = Column(Integer, info = {'format' : '9d', 'le' : 0})
-    column06 = Column(Float(precision = 53), info = {'format' : '17.5f', 'gt' : 1000.0, 'le' : 9999999999.999})
-    column07 = Column(String(12), info = {'regex' : r'[A-Z ]+$'})
-    column08 = Column(DateTime, info = {'format' : '%Y-%m-%d %H:%M:%S'})
-
-    pk = ['column05']
-
-@schema.add_model
-class mymodel03:
-    column09 = Column(Integer, info = {})
-    column10 = Column(Float(precision = 53), info = {})
-    column11 = Column(String(12), info = {})
-    column12 = Column(DateTime, info = {})
-
-    pk = ['column09']
-
-class MyModel01(schema.mymodel01): __tablename__ = 'Test_MyModel01'
-class MyModel02(schema.mymodel02): __tablename__ = 'Test_MyModel02'
-class MyModel03(schema.mymodel03): __tablename__ = 'Test_MyModel03'
 # ==============================================================================
+# FlatFileMixin Tests
 
-class TestSuper:
-    """Parent class to handle setup/teardown operations of child classes."""
+class TestFlatFileMixin(unittest.TestCase):
 
     def setUp(self):
-        """Initialize a database connection and tables."""
 
-        super().setUp()
+        # Build schema + model dynamically
+        self.schema = Schema('Test Schema').load(TEST_SCHEMA)
 
-        connection = 'sqlite:///tests/resources/libra_test.db'
+        class Record(self.schema.record): 
+            __tablename__ = 'record'
 
-        # Get connection and create tables
-        self.engine = create_engine(connection)
-        self.session = Session(self.engine)
-        schema.base.metadata.create_all(self.engine)
+            def __iter__(self):
+                return iter([self.id, self.name, self.score, self.created])
+        
+        self.model = Record
 
-        # Test FlatFile
-        self.ffile = 'tests/resources/ff_write.out'
+        # Example test instance
+        self.instance = self.model(123, 'Alice', 98.5, datetime.datetime(2025, 1, 1))
+    
+    def test_fixed_width_write(self):
+        result = self.instance.to_string(fixed_width = True, delimiter = '')
 
-        # Add data to tables
-        self.session.add(MyModel01(1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10)))
-        self.session.add(MyModel01(2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)))
-        self.session.add(MyModel01(3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)))
-        self.session.add(MyModel01(4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)))
-        self.session.add(MyModel02(1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10)))
-        self.session.add(MyModel02(2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)))
-        self.session.add(MyModel02(3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)))
-        self.session.add(MyModel02(4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)))
+        expected = '  123Alice                  98.502025-01-01\n'
 
-        self.session.commit()
+        self.assertEqual(result, expected)
+    
+    def test_fixed_width_with_delimiter(self):
+        result = self.instance.to_string(fixed_width = True, delimiter = '|')
 
-    def tearDown(self):
-        """Remove created tables and test files written"""
+        expected = '  123|Alice               |   98.50|2025-01-01\n'
 
-        MyModel01.__table__.drop(self.engine)
-        MyModel02.__table__.drop(self.engine)
+        self.assertEqual(result, expected)
+    
+    def test_fixed_width_round_trip(self):
+        line = self.instance.to_string(fixed_width = True, delimiter = '|')
+        parsed = self.instance.from_string(line, fixed_width = True, delimiter = '|')
 
-        self.session.commit()
+        self.assertEqual(parsed.id, 123)
+        self.assertEqual(parsed.name.strip(), 'Alice')
+        self.assertEqual(parsed.score, 98.5)
+        self.assertEqual(parsed.created, datetime.datetime(2025, 1, 1))
+    
+    def test_variable_width_write(self):
+        result = self.instance.to_string(fixed_width = False, delimiter = ',')
+
+        expected = '123,Alice,98.5,2025-01-01'
+
+        self.assertEqual(result, expected)
+    
+    def test_variable_width_round_trip(self):
+        line = '123,Alice,98.5,2025-01-01'
+        parsed = self.instance.from_string(line, fixed_width = False, delimiter = ',')
+
+        self.assertEqual(parsed.id, 123)
+        self.assertEqual(parsed.name, 'Alice')
+        self.assertEqual(parsed.score, 98.5)
+        self.assertEqual(parsed.created, datetime.datetime(2025, 1, 1))
+    
+    def test_default_on_error(self):
+        bad_line = 'abc,Alice,98.5,2025-01-01'
+
+        parsed = self.instance.from_string(
+            bad_line,
+            fixed_width = False,
+            delimiter = ',',
+            default_on_error = ['id']
+        )
+
+        self.assertEqual(parsed.id, -1)
+        self.assertEqual(parsed.name, 'Alice')
+    
+    def test_datetime_parse_failure(self):
+        bad_line = '123,Alice,98.5,not-a-date'
+
+        parsed = self.instance.from_string(
+            bad_line,
+            fixed_width = False,
+            delimiter = ',',
+            default_on_error = ['created']
+        )
+
+        self.assertIsInstance(parsed.created, datetime.datetime)
+
+    def test_missing_width_falls_back(self):
+        self.model.__table__.columns['name'].info.pop('width')
+
+        instance = self.model(123, 'Alice', 98.5, datetime.datetime(2025, 1, 1))
+        setattr(instance, '__cached_format_string', None)
+
+        result = instance.to_string(fixed_width = True, delimiter = ',')
+
+        self.assertEqual(result, '123,Alice,98.5,2025-01-01')
+
+
+# ==============================================================================
+# PandasMixin Tests
+
+class TestPandasMixin(unittest.TestCase):
+
+    def setUp(self):
+
+        # Build schema + model dynamically
+        self.schema = Schema('Test Schema').load(TEST_SCHEMA)
+
+        class Record(self.schema.record): 
+            __tablename__ = 'record'
+        
+        self.model = Record
+
+        # Example test instance & list of instances
+        self.instance = self.model(123, 'Alice', 98.5, datetime.datetime(2025, 1, 1))
+        
+        self.instances = [
+            self.model(1, 'Joey', 78.3, datetime.datetime(2026, 1, 12)),
+            self.model(2, 'Chandler', 99.2, datetime.datetime(2026, 2, 16)),
+            self.model(3, 'Monica', 93.4, datetime.datetime(2026, 5, 5)),
+            self.model(4, 'Phoebe', 86.2, datetime.datetime(2026, 6, 19)),
+            self.model(5, 'Ross', 93.3, datetime.datetime(2026, 7, 4)),
+            self.model(6, 'Rachel', 80.0, datetime.datetime(2026, 10, 31))
+        ]
+
+    def test_to_series(self):
+        s = self.instance.to_series()
+
+        self.assertIsInstance(s, pd.Series)
+        self.assertEqual(s['id'], 123)
+        self.assertEqual(s['name'], 'Alice')
+        self.assertEqual(s['score'], 98.5)
+        self.assertEqual(s['created'], datetime.datetime(2025, 1, 1))
+    
+    def test_from_series(self):
+        s = self.instance.to_series()
+        new_instance = self.model.from_series(s)
+
+        self.assertEqual(new_instance.id, 123)
+        self.assertEqual(new_instance.name, 'Alice')
+        self.assertEqual(new_instance.score, 98.5)
+        self.assertEqual(new_instance.created, datetime.datetime(2025, 1, 1))
+
+    def test_from_frame(self):
+        df = self.model.to_frame(self.instances)
+        new_instances = self.model.from_frame(df)
+
+        self.assertEqual(len(new_instances), 6)
+        self.assertEqual(new_instances[0].name, 'Joey')
+        self.assertEqual(new_instances[1].name, 'Chandler')
+    
+    def test_nan_to_none(self):
+        df = pd.DataFrame([
+            {'id' : 7, 'name' : None, 'score' : float('nan'), 'created' : None}
+        ])
+
+        instances = self.model.from_frame(df)
+        instance = instances[0]
+
+        self.assertEqual(instance.id, 7)
+        self.assertIsNone(instance.name)
+        self.assertIsNone(instance.score)
+        self.assertIsInstance(instance.created, datetime.datetime) # 'default' invoked when DateTime val is None
+    
+    def test_datetime_string_coercion(self):
+        df = pd.DataFrame([
+            {'id' : 8, 'name' : 'Gunther', 'score' : 100., 'created' : '2026-11-25'}
+        ])
+
+        instance = self.model.from_frame(df)[0]
+
+        self.assertIsInstance(instance.created, datetime.datetime)
+        self.assertEqual(instance.created, datetime.datetime(2026, 11, 25))
+
+
+# ==============================================================================
+# QC Mixin Tests
+
+class TestQCMixin(unittest.TestCase):
+    
+    def setUp(self):
+
+        # Build schema & model dynamically
+        self.schema = Schema('Test Schema').load(TEST_SCHEMA)
+
+        class Record(self.schema.record):
+            __tablename__ = 'record'
+        
+        self.model = Record
+
+        self.instances = [
+            self.model(1, 'Monica', 99.1, datetime.datetime(2025, 1, 1)),
+            self.model(2, 'Phoebe', 84.3, datetime.datetime(2025, 1, 2)),
+            self.model(3, 'Chandler', 87.9, datetime.datetime(2025, 1, 3)),
+            self.model(4, 'Joey', 64.3, datetime.datetime(2025, 1, 3)),
+            self.model(5, 'Rachel', 86.9, datetime.datetime(2025, 1, 3)),
+            self.model(6, 'Ross', 90.2, datetime.datetime(2025, 1, 4))
+        ]
+    
+    def test_structure_valid(self):
+        report = self.model.qc(self.instances, self.schema)
+
+        titles = [section[0] for section in report.sections]
+        self.assertIn("Table 'record' Validation", titles)
+
+        content = str(report.sections[0][1])
+        self.assertIn("found as model 'record'", content)
+    
+    def test_structure_invalid_model(self):
+
+        class BadRecord(self.schema.record):
+            __tablename__ = 'bad_record'
+
+            extra = sqlalchemy.Column(sqlalchemy.String())
+        
+        bad_instances = [BadRecord('extra', 1, 'Gunther', 99.5, datetime.datetime(2025, 1, 3))]
+
+        report = BadRecord.qc(bad_instances, self.schema)
+
+        content = str(report.sections[0][1])
+        self.assertIn("not found as a valid model", content)
+    
+    def test_unique_constraint_violation(self):
+        instances = [
+            self.model(1, 'Chandler', 87.9, datetime.datetime(2025, 1, 3)),
+            self.model(2, 'Chandler', 84.1, datetime.datetime(2025, 1, 4))
+        ]
+
+        report = self.model.qc(instances, self.schema)
+
+        content = str(report.sections[0][1])
+        self.assertIn("UQ violation", content)
+    
+    def test_primary_key_violation(self):
+        instances = [
+            self.model(1, 'Phoebe', 84.3, datetime.datetime(2025, 1, 2)),
+            self.model(1, 'Phoebe', 86.1, datetime.datetime(2025, 1, 5))
+        ]
+
+        report = self.model.qc(instances, self.schema)
+
+        content = str(report.sections[0][1])
+        self.assertIn("PK violation", content)
+    
+    def test_value_rule_violation(self):
+        instances = [self.model(-5, 'Gunther', 99.5, datetime.datetime(2025, 1, 3))]
+
+        report = self.model.qc(instances, self.schema)
+
+        content = str(report.sections[0][1])
+        self.assertIn('1 rule violations', content)
+    
+    def test_no_rule_violations(self):
+        report = self.model.qc(self.instances, self.schema)
+
+        content = str(report.sections[0][1])
+        self.assertIn("0 rule violations", content)
+    
+    def test_summary_generation(self):
+        report = self.model.qc(
+            self.instances,
+            self.schema,
+            summarize=True,
+            summarize_n=2
+        )
+
+        section_items = report.sections[0][1]
+
+        has_table = any(isinstance(item, Table) or hasattr(item, 'renderable')
+                        for item in section_items)
+
+        self.assertTrue(has_table)
+    
+    def test_render_to_file(self):
+
+        report = self.model.qc(self.instances, self.schema)
+
+        filepath = "test_qc_output.txt"
 
         try:
-            os.remove(self.ffile)
-        except OSError:
-            pass
-            
-        super().tearDown()
+            report.render_to_file(filepath)
 
-# ==============================================================================
-# Classes to test FlatFile Mixin functionality
+            self.assertTrue(os.path.exists(filepath))
 
-class Test_StringFormatter(TestSuper, unittest.TestCase):
-    """Class to test the string_formatter function"""
+            with open(filepath, 'r', encoding='utf-8') as f:
+                contents = f.read()
 
-    def setUp(self):
-        super().setUp()
+            self.assertIn("record", contents)
 
-    def test_stringformatter_ormprop_defined(self):
-        """Ensure _format_string for ORM is defined if all info format keys defined"""
+        finally:
+            if os.path.exists(filepath):
+                os.remove(filepath)
 
-        mod = MyModel01(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
-
-        return self.assertEqual(mod._format_string, '{0:9d} {1:17.5f} {2:15.15s} {3:%Y-%m-%d %H:%M:%S}\n')
-
-    def test_stringformatter_ormprop_undefined(self):
-        """Ensure _format_string for ORM is None if all info format keys undefined"""
-
-        mod = MyModel02(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
-
-        return self.assertEqual(mod._format_string, '{0:9d} {1:17.5f} {2:None} {3:%Y-%m-%d %H:%M:%S}\n')
-
-    def test_stringformatter_dbquery_whole(self):
-        """Test string_formatter on a database query that returns a whole ORM"""
-
-        recs = self.session.query(MyModel01).all()
-
-        truth = ['        1        1000.00000 testing         2025-10-31 12:15:10\n', '        2        1000.00000 testing schema  2025-10-31 12:15:11\n', '        3         999.10000 testing         2025-10-31 12:15:12\n', '        4        1000.00000 testing         2025-10-31 12:15:13\n']
-
-        [self.assertEqual(rec._format_string.format(*rec), t) for rec, t in zip(recs, truth)]
-
-    def test_stringformatter_dbquery_partial(self):
-        """Test string_formatter on a database query that returns a partial ORM"""
-
-        recs = self.session.query(MyModel01.column01, MyModel01.column04).all()
-        fmt = string_formatter(schema.base.metadata, ['column01', 'column04'])
-
-        truth = ['        1 2025-10-31 12:15:10\n', '        2 2025-10-31 12:15:11\n', '        3 2025-10-31 12:15:12\n', '        4 2025-10-31 12:15:13\n']
-
-        [self.assertEqual(fmt.format(*rec), t) for rec, t in zip(recs, truth)]
-
-    def test_stringformatter_dbquery_undefined_whole(self):
-        """Test stringformatter from a db query where column format undefined"""
-
-        rec = self.session.query(MyModel02).first()
-        
-        with self.assertRaises(ValueError):
-            rec._format_string.format(*rec)
-
-    def test_stringformatter_dbquery_undefined_partial_good(self):
-        """Test string_formatter on dbquery where partial column formatting has format defined"""
-
-        rec = self.session.query(MyModel02.column05, MyModel02.column06).first() # column05, column06 have format defined
-        fmt = string_formatter(schema.base.metadata, ['column05', 'column06'])
-
-        truth = '        1        1000.00000\n'
-
-        self.assertEqual(fmt.format(*rec), truth)
-    
-    def test_stringformatter_dbquery_undefined_partial_bad(self):
-        """Test string_formatter on dbquery where partial column formatting does not have format defined"""
-
-        rec = self.session.query(MyModel02.column05, MyModel02.column07).first() # column07 does not have format defined
-        fmt = string_formatter(schema.base.metadata, ['column05', 'column07'])
-
-        with self.assertRaises(ValueError):
-            fmt.format(*rec)
-
-    def tearDown(self):
-        super().tearDown()
-
-class Test_FromString(TestSuper, unittest.TestCase):
-    """Test from_string() function"""
-
-    def setUp(self):
-        super().setUp()
-
-    def test_fromstring_singleline(self):
-        """Test from_string() function on a single line."""
-
-        line : str = '        1        1000.00000 testing         2025-10-31 12:15:10\n'
-
-        mod = from_string(MyModel01, [line])[0]
-
-        self.assertEqual(mod.column01, 1)
-        self.assertEqual(mod.column02, 1000.0)
-        self.assertEqual(mod.column03, 'testing')
-        self.assertEqual(mod.column04, datetime(2025, 10, 31, 12, 15, 10))
-
-    def tearDown(self):
-        super().tearDown()
-
-class Test_ToString(TestSuper, unittest.TestCase):
-    """Test to_string() function"""
-
-    def setUp(self):
-        super().setUp()
-    
-    def test_fromstring_singleline(self):
-        """Test from_string() function on a single line."""
-
-        line : str = '        1        1000.00000 testing         2025-10-31 12:15:10\n'
-
-        mod = MyModel01(1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10))
-
-        string = to_string([mod])[0]
-
-        self.assertEqual(string, line)
-    
-    def tearDown(self):
-        super().tearDown()
-
-# ==============================================================================
-# Classes to test Pandas Mixin functionality
-
-class Test_ToDataFrame(TestSuper, unittest.TestCase):
-    """Class to test ORM to Pandas DataFrame conversion."""
-
-    def setUp(self):
-        super().setUp()
-
-    def test_todframe_single_declared_orm(self):
-        """Test to_dframe function on a single OOP declared ORM"""
-
-        mod1 = MyModel01(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
-
-        dframe_test = to_dframe([mod1])
-        dframe_true = pd.DataFrame(
-            data = [[1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12)]],
-            columns = ['column01', 'column02', 'column03', 'column04']
-        )
-
-        self.assertIsNone(assert_frame_equal(dframe_test, dframe_true))
-    
-    def test_todframe_multiple_declared_orms(self):
-        """Test to_dframe function on multiple OOP declared ORMs"""
-
-        mod1 = MyModel01(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
-        mod2 = MyModel01(2, 1000.0, 'testing to_dframe()', datetime(2025, 10, 31, 12, 15, 13))
-        mod3 = MyModel01(3, 100., 'testing to_dframe()', datetime(2025, 10, 31, 12, 15, 14))
-
-        dframe_test = to_dframe([mod1, mod2, mod3])
-        dframe_true = pd.DataFrame(
-            data = [
-                [1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12)],
-                [2, 1000.0, 'testing to_dframe()', datetime(2025, 10, 31, 12, 15, 13)],
-                [3, 100., 'testing to_dframe()', datetime(2025, 10, 31, 12, 15, 14)]
-            ],
-            columns = ['column01', 'column02', 'column03', 'column04']
-        )
-
-        self.assertIsNone(assert_frame_equal(dframe_test, dframe_true))
-
-    def test_todframe_single_queried_orm(self):
-        """Test to_dframe() on a single-line ORM queried from a database."""
-
-        mod1 = self.session.query(MyModel01).filter(MyModel01.column01 == 1)[0]
-
-        dframe_test = to_dframe([mod1])
-        dframe_true = pd.DataFrame(
-            data = [[1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10)]],
-            columns = ['column01', 'column02', 'column03', 'column04']
-        )
-
-        self.assertIsNone(assert_frame_equal(dframe_test, dframe_true))
-
-    def test_todframe_multiple_queried_orms(self):
-        """Test to_dframe() on a multi-line ORM query from a database."""
-
-        mod = self.session.query(MyModel01).all()
-
-        dframe_test = to_dframe(mod)
-        dframe_true = pd.DataFrame(
-            data = [
-                [1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10)],
-                [2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)],
-                [3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)],
-                [4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)]
-            ],
-            columns = ['column01', 'column02', 'column03', 'column04']
-        )
-
-        self.assertIsNone(assert_frame_equal(dframe_test, dframe_true))
-
-    def tearDown(self):
-        super().tearDown()
-
-class Test_FromDataFrame(TestSuper, unittest.TestCase):
-    """Class to test Pandas DataFrame to ORM conversion."""
-
-    def setUp(self):
-        super().setUp()
-    
-    def test_fromdframe(self):
-        """Test from_dframe() on a Pandas DataFrame"""
-
-        dframe = pd.DataFrame(
-            data = [
-                [1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 10)],
-                [2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)],
-                [3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)],
-                [4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)]
-            ],
-            columns = ['column01', 'column02', 'column03', 'column04']
-        )
-
-        mod = from_dframe(dframe, MyModel01)
-        
-        self.assertEqual(mod[0], MyModel01(1, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 11)))
-        self.assertEqual(mod[1], MyModel01(2, 1000.0, 'testing schema', datetime(2025, 10, 31, 12, 15, 11)))
-        self.assertEqual(mod[2], MyModel01(3, 999.1, 'testing', datetime(2025, 10, 31, 12, 15, 12)))
-        self.assertEqual(mod[3], MyModel01(4, 1000.0, 'testing', datetime(2025, 10, 31, 12, 15, 13)))
-
-    def tearDown(self):
-        super().tearDown()
-
-# ==============================================================================
-# Classes to test QC functionality
-
-class Test_QC(TestSuper, unittest.TestCase):
-    """Class to test quality control functionality for ORMs."""
-
-    def setUp(self):
-        super().setUp()
-
-    def test_simple_qc_single_orm_all_true(self):
-        """Test simple_qc() on single ORM where all checks return True"""
-
-        mod1 = MyModel01(1, 9999999999.999, 'testing my schema', datetime(2025, 10, 31, 12, 15, 12))
-
-        qc_result = mod1.simple_qc()
-        
-        self.assertTrue(qc_result.result['column01'][0]['result'])
-        self.assertTrue(qc_result.result['column02'][0]['result'])
-        self.assertTrue(qc_result.result['column02'][1]['result'])
-        self.assertTrue(qc_result.result['column03'][0]['result'])
-    
-    def test_simple_qc_single_orm_some_true(self):
-        """Test simple_qc() on single ORM where some checks return False"""
-
-        mod1 = MyModel01(0, -1000.0, 'Testing', datetime(2025, 10, 31, 12, 15, 00))
-
-        qc_result = mod1.simple_qc()
-
-        self.assertFalse(qc_result.result['column01'][0]['result'])
-        self.assertFalse(qc_result.result['column02'][0]['result'])
-        self.assertTrue(qc_result.result['column02'][1]['result'])
-        self.assertFalse(qc_result.result['column03'][0]['result'])
-    
-    def test_simple_qc_multiple_orms_all_true(self):
-        """Test simple_qc() on multiple orms that produce all True results"""
-
-        mod = self.session.query(MyModel01).all()
-
-        qc_result = simple_qc(mod)
-
-        for entry in qc_result:
-            self.assertTrue(entry.result['column01'][0]['result'])
-            self.assertTrue(entry.result['column02'][0]['result'])
-            self.assertTrue(entry.result['column02'][1]['result'])
-            self.assertTrue(entry.result['column03'][0]['result'])
-
-    def test_simple_qc_multiple_orms_some_false(self):
-        """Test simple_qc() on multiple orms that produce some False results"""
-
-        mod = self.session.query(MyModel02).all()
-
-        qc_result = simple_qc(mod)
-
-        for entry in qc_result:
-            self.assertFalse(entry.result['column05'][0]['result'])
-            self.assertFalse(entry.result['column06'][0]['result'])
-            self.assertTrue(entry.result['column06'][1]['result'])
-            self.assertFalse(entry.result['column07'][0]['result'])
-
-    def tearDown(self):
-        super().tearDown()
 
 # ==============================================================================
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main()  

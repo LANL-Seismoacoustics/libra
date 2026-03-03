@@ -1,10 +1,11 @@
 """
-Brady Spears
-5/5/25
+Brady Spears, Los Alamos National Laboratory
+10/7/2025
 
-Contains the `MetaClass` object, which is a child of SQLAlchemy's 
-DeclarativeMeta class. The `MetaClass` object defines methods to operate on 
-any declarative base model inheriting from from `MetaClass`.
+Contains the LibraMetaClass object, which, as a child of SQLAlchemy's own 
+DeclarativeMeta class, passes methods and attributes to all ORM objects 
+inheriting from it. By default, all models belonging to a libra.Schema object 
+will inherit functionality from this metaclass.
 """
 
 # ==============================================================================
@@ -13,49 +14,86 @@ from __future__ import annotations
 import decimal
 from typing import Any
 from typing import Iterator
-import pdb
 
 import sqlalchemy
 from sqlalchemy.orm import DeclarativeMeta
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm.decl_base import _declarative_constructor
-from sqlalchemy.sql.schema import ScalarElementColumnDefault
+from sqlalchemy.sql.schema import ScalarElementColumnDefault, CallableColumnDefault
 
 # ==============================================================================
+# Metaclass Methods
 
 def _positional_init(self, *args : Any) -> None:
     """
-    TODO: _positional_init docstring
+    Initialize self with required, positional arguments - one for each column in 
+    a model's mapped table.
+
+    Parameters
+    ----------
+    *args : Any
+        Argument for each column in a table in positional order of the columns.
+    
+    Raises
+    ------
+    ValueError
+        If the expected number of positional arguments does not match the number
+        of columns belonging to a model's mapped table.
     """
 
     if len(args) != len(self.__table__.columns):
-        raise ValueError('Positional arguments required for each column.')
+        raise ValueError(f'Positional arguments required for each column. Got {len(args)}, expected {len(self.__table__.columns)}.')
     
     for column, ival in zip(self.__table__.columns, args):
-        # This can be done better
         if ival is None and column.default:
-            setattr(self, self._attrname[column.name], column.default.arg)
+            if isinstance(column.default, CallableColumnDefault) or hasattr(column.default, '__call__'):
+                setattr(self, self._attrname[column.name], column.default.arg(''))
+            else:
+                setattr(self, self._attrname[column.name], column.default.arg)
         else:
             setattr(self, self._attrname[column.name], ival)
 
 def _keyword_init(self, **kwargs : Any) -> None:
     """
-    TODO: _keyword_init docstring
+    Initialize self with keyword arguments, where each keyword maps to a column 
+    in a model's mapped table.
+
+    Parameters
+    ----------
+    **kwargs : Any
+        Keyword belongs to a column in a model, and the associated value is 
+        mapped to that attribute of the model
     """
 
     _declarative_constructor(self, **kwargs)
     for column in self.__mapper__.columns:
         val = getattr(self, column.name, None)
         if val is None and column.default:
-            setattr(self, self._attrname[column.name], column.default.arg)
+            if isinstance(column.default, CallableColumnDefault) or hasattr(column.default, '__call__'):
+                setattr(self, self._attrname[column.name], column.default.arg(''))
+            else:
+                setattr(self, self._attrname[column.name], column.default.arg)
         else:
             setattr(self, self._attrname[column.name], val)
-        
-# ==============================================================================
 
 def _init(self, *args : Any | None, **kwargs : Any | None) -> None:
     """
-    TODO: _init docstring
+    Constructor for a model.
+
+    Parameters
+    ----------
+    *args : Any
+        Positional arguments mapped to each column in a model's __table__ 
+        attribute.
+    **kwargs : Any
+        Keyword arguments mapped to column names in a model's __table__ 
+        attribute.
+    
+    Raises
+    ------
+    ValueError
+        Raised if both positional and keyword arguments are passed in an attempt
+        to instantiate an ORM instance.
     """
 
     if args and kwargs:
@@ -66,15 +104,14 @@ def _init(self, *args : Any | None, **kwargs : Any | None) -> None:
     else:
         _keyword_init(self, **kwargs)
 
-def _str(self) -> str: 
-    """
-    TODO: _str() docstring
-    """
-    try:
-        items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.columns]
-    except NotImplementedError:
-        items = [(col.name, str, getattr(self, col.name))for col in self.__mapper__.columns]
+def _str(self) -> str:
+    """Show all columns and their assigned values."""
 
+    try:
+        items = [(col.name, _normalize_decimal(col.type.python_type), getattr(self, col.name)) for col in self.__mapper__.columns]
+    except NotImplementedError: # col.type.python_type is NotImplemented for non-standard types
+        items = [(col.name, str, getattr(self, col.name)) for col in self.__mapper__.columns]
+    
     _string = self.__class__.__name__ + '('
     for i, item in enumerate(items):
         key, _type_op, val = item[0], item[1], item[2]
@@ -86,45 +123,27 @@ def _str(self) -> str:
             _string += f'{key}=\'{_type_op(val)}\''
         else:
             _string += f'{key}={val}'
-
-        if i != len(items) - 1:
-            _string += ', '
-
-    return _string + ')'
-
-def _repr(self) -> str: 
-    """
-    TODO: _repr() docstring
-    """
-    try:
-        items = [(col.name, col.type.python_type, getattr(self, col.name)) for col in self.__mapper__.primary_key]
-    except NotImplementedError:
-        items = [(col.name, str, getattr(self, col.name))for col in self.__mapper__.primary_key]
-
-    _string = self.__class__.__name__ + '('
-    for i, item in enumerate(items):
-        key, _type_op, val = item[0], item[1], item[2]
-
-        if isinstance(val, ScalarElementColumnDefault):
-            val = val.arg
         
-        if isinstance(val, str) and _type_op == str:
-            _string += f'{key}=\'{val}\''
-        else:
-            _string += f'{key}={val}'
-        # if isinstance(val, bool or int or float or decimal.Decimal) or val is None:
-        #     _string += f'{key}={val}'
-        # else:
-        #     _string += f'{key}=\'{str(val)}\''
-
         if i != len(items) - 1:
             _string += ', '
-
+        
     return _string + ')'
 
-def _getitem(self, item : int | str) -> Any: 
+def _getitem(self, item : int | str) -> Any:
     """
-    TODO: _getitem() docstring
+    Get the associated value for a particular column; either by keyword or by 
+    the column's position.
+
+    Parameters
+    ----------
+    item : int | str
+        Keyword associated with the column or integer position of the column 
+        in the model's __table__ attribute.
+    
+    Returns
+    -------
+    Any
+        The value associated with that column.
     """
 
     if isinstance(item, int):
@@ -134,12 +153,19 @@ def _getitem(self, item : int | str) -> Any:
 
     if isinstance(val, ScalarElementColumnDefault):
         val = val.arg
-    
+
     return val
 
-def _setitem(self, item : int | str, val : Any) -> None: 
+def _setitem(self, item : int | str, val : Any) -> None:
     """
-    TODO: _setitem() docstring
+    Set a column to a particular value. 
+
+    Parameters
+    ----------
+    item : int | str
+        Column name of column position within a models __table__ attribute.
+    val : Any
+        Value to associate with that column
     """
 
     if isinstance(item, int):
@@ -147,80 +173,107 @@ def _setitem(self, item : int | str, val : Any) -> None:
     
     if val is None and self.__table__.columns[item].default:
         val = self.__table__.columns[item].default
-
+    
     setattr(self, item, val)
 
-def _len(self) -> int: 
+def _len(self) -> int:
     """
-    TODO: _len() docstring
+    Returns the number of columns in a model's __table__ attribute.
+
+    Returns
+    -------
+    int
+        Integer number of columns in a model.
     """
 
     return len(self.__table__.columns)
 
-def _eq(self, other : type[MetaClass]) -> bool: 
+def _eq(self, other : type[LibraMetaClass]) -> bool:
     """
-    TODO: _eq() docstring
+    Determines if two children of LibraMetaClass are equal on the values 
+    contained in their primary key columns.
+
+    Parameters
+    ----------
+    other : type[LibraMetaClass]
+        A child of LibraMetaClass
+    
+    Returns
+    -------
+    bool
+        True if values on all primary keys between the two instances are equal; 
+        False if they are not.
     """
 
     return all([getattr(self, col.name) == getattr(other, col.name) for col in self.__table__.primary_key.columns])
 
-def _update_docstring(cls) -> str:
-    """
-    TODO: _update_docstring() docstring
-    """
-
+def _repr(self) -> str:
+    """Show only primary key columns and their assigned values."""
     
-
-
-    return NotImplementedError
-
-def _keys(cls) -> list[str]:
-    return [c.name for c in cls.__table__.columns]
-
-def _values(cls) -> list[Any]:
-    return [cls[k] for k in cls.keys()]
-
-def _items(cls) ->  Iterator[tuple[str, Any]]:
-    return zip(cls.keys(), cls.values())
-
-def _to_dict(cls) -> dict[str, Any]:
-    return {k : v for k, v in cls.items()}
-
-def _get_infoval(cls, key : str, cols : list[str] | None = None) -> dict:
-
-    if not cols:
-        cols = [col.name for col in cls.__table__.columns]
+    try:
+        items = [(col.name, _normalize_decimal(col.type.python_type), getattr(self, col.name)) for col in self.__mapper__.primary_key]
+    except NotImplementedError:
+        items = [(col.name, str, getattr(self, col.name)) for col in self.__mapper__.primary_key]
     
-    vals = [col.info.get(key, None) for col in cls.__table__.columns]
+    _string = self.__class__.__name__ + '('
+    for i, item in enumerate(items):
+        key, _type_op, val = item[0], item[1], item[2]
 
-    return cols, vals
+        if isinstance(val, ScalarElementColumnDefault):
+            val = val.arg
+
+        if isinstance(val, str) and _type_op == str:
+            _string += f'{key}=\'{val}\''
+        else:
+            _string += f'{key}={val}'
+        
+        if i != len(items) - 1:
+            _string += ', '
+    
+    return _string + ')'
+
+def _keys(self) -> list[str]:
+    """Return a list of columns in a model's __table__ attribute"""
+
+    return [c.name for c in self.__table__.columns]
+
+def _values(self) -> list[Any]:
+    """Return a list of values for each key in a model"""
+
+    return [self[k] for k in self.keys()]
+
+def _items(self) -> Iterator[tuple[str, Any]]:
+    """Return a zipped tuple containing keys and values of a model"""
+
+    return zip(self.keys(), self.values())
+
+def _to_dict(self) -> dict[str, Any]:
+    """Convert instance to a dict of form {<column_name> : <value>}"""
+
+    return {col.name : getattr(self, col.name) for col in self.__table__.columns}
 
 # ==============================================================================
 
-class MetaClass(DeclarativeMeta):
+class LibraMetaClass(DeclarativeMeta):
     """
-    Metaclass to be used within the instantiation of an SQLAlchemy declarative 
-    base class, that will bequeath its methods onto all subclasses inheriting 
-    from that declarative base class.
+    Metaclass instance to be used within the instantiation of an SQLAlchemy 
+    declarative base class that will bequeath its methods onto all subclasses 
+    inheriting from that declarative base class.
     """
 
-    def __new__(cls, clsname, parents, dct) -> None:
+    def __new__(cls, clsname : str, parents : tuple[Any], dct : dict[str, Any]) -> None:
 
-        # Child classes will have methods/data put into 'dct'
-        dct['__init__']    = _init
-        dct['__str__']     = _str
-        dct['__repr__']    = _repr
-        dct['__getitem__'] = _getitem
-        dct['__setitem__'] = _setitem
-        dct['__len__']     = _len
-        dct['__eq__']      = _eq
-        dct['keys']        = _keys
-        dct['values']      = _values
-        dct['items']       = _items
-        dct['to_dict']     = _to_dict
-        dct['get_infoval'] = _get_infoval
-        
-        # Equal methods that compare on unique keys & all columns would be useful
+        dct['__init__']        = _init
+        dct['__str__']         = _str
+        dct['__repr__']        = _repr
+        dct['__getitem__']     = _getitem
+        dct['__setitem__']     = _setitem
+        dct['__len__']         = _len
+        dct['__eq__']          = _eq
+        dct['keys']            = _keys
+        dct['values']          = _values
+        dct['items']           = _items
+        dct['to_dict']         = _to_dict
 
         dct['_col_registry'] = {}
 
@@ -228,8 +281,8 @@ class MetaClass(DeclarativeMeta):
             schema, tablename = dct['__tablename__'].split('.')
             dct['__tableowner__'], dct['__tablename__'] = schema, tablename
 
-            SchemaBase = declarative_base(metadata = sqlalchemy.MetaData(schema=schema))
-            
+            SchemaBase = declarative_base(metadata = sqlalchemy.MetaData(schema = schema))
+
             for p in parents:
                 if getattr(p, '_col_registry', {}):
                     SchemaBase._col_registry = p._col_registry
@@ -242,13 +295,43 @@ class MetaClass(DeclarativeMeta):
         except ValueError: # Not a schema-qualified name
             dct['_tableowner'] = None
 
-        return super(MetaClass, cls).__new__(cls, clsname, parents, dct)
-    
-    def __init__(cls, clsname, parents, dct) -> None:
-        super(MetaClass, cls).__init__(clsname, parents, dct)
+        return super(LibraMetaClass, cls).__new__(cls, clsname, parents, dct)
+
+    def __init__(cls, clsname : str, parents : tuple[Any], dct : dict[str, Any]) -> None:
+
+        super(LibraMetaClass, cls).__init__(clsname, parents, dct)
 
         if hasattr(cls, '__table__'):
             cls._attrname = {col.name : col.key for col in cls.__mapper__.columns}
-            cls.__doc__ = _update_docstring(cls)
             cls._tabletype = parents[0].__name__
             cls._tableschema = parents[0].__module__.split('.')[-1]
+        
+# ==============================================================================
+
+def _normalize_decimal(value : Any) -> Any:
+    """
+    Some SQLAlchemy Type objects' associated Python types map to a
+    decimal.Decimal object. For those cases, we'd prefer a standard Python type
+    of int or float.
+
+    Parameters
+    ----------
+    value : Any
+        Value of any type, where decimal.Decimal types are specifically cast to
+        either an int or float Python type. 
+    
+    Returns
+    -------
+    Any
+        Input value if type is not decimal.Decimal, otherwise a translated 
+        float or int Python type.
+    """
+
+    if not isinstance(value, decimal.Decimal):
+        return value
+
+    if value == value.to_integral_value():
+        return int(value)
+    else:
+        return float(value)
+    

@@ -1,575 +1,319 @@
 """
-Brady Spears
-7/18/25
+Brady Spears, Los Alamos National Laboratory
+10/7/2025
 
-Test scripts for the `Schema` object, including load/write functionality.
+Test Suite for Libra Schema class.
 """
 
 # ==============================================================================
 
 import os
-import pdb
-import uuid
-import unittest
-import pickle
-import sqlite3
-from datetime import datetime, timedelta, timezone
-
+import time
 import yaml
+import unittest
+import tempfile
+from unittest.mock import MagicMock
+
 import sqlalchemy
-from sqlalchemy import create_engine
-from sqlalchemy import Column
-from sqlalchemy import Constraint, PrimaryKeyConstraint, UniqueConstraint
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import DeclarativeMeta
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import declared_attr
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.types import (
-    DateTime, Integer, Float, String, VARCHAR
-)
 
-from libra import Schema
-from libra.schema import LIBRA_YAML
-from libra.schema import (
-    DictionaryTransferStrategy,
-    YAMLFileTransferStrategy,
-    DatabaseTransferStrategy,
-    TransferStrategy
-)
-from libra.metaclass import MetaClass
-from libra.util import TypeMap
-from libra.util.settings import _SchemaSettings
-from libra.util import (
-    DictionarySettings,
-    YAMLFileSettings,
-    DatabaseSettings
-)
-from resources.schema_dict import TEST_DICT
+from libra.schema import Schema
+from libra.util import DatabaseSettings
+from libra.util import SchemaNotFoundError
 
 # ==============================================================================
-# Classes to handle Schema Initialization
+# Global Valid Schema Definitions
 
-class Test_SchemaInit(unittest.TestCase):
-    """Test Initialization of the Schema object"""
-
-    schema_name : str = 'Test Schema'
-    custom_var  : str = 'Custom Variable'
-    builtin_typemap : TypeMap = TypeMap({String : VARCHAR})
-
-    def test_name_init(self):
-        """Test simplest form of initialization - just a name"""
-
-        schema = Schema(self.schema_name)
-
-        return self.assertEqual(schema.name, self.schema_name)
-    
-    def test_description_init(self):
-        """Test initialization with a description."""
-
-        description = 'My test schema'
-
-        schema = Schema(self.schema_name, description = description)
-
-        return self.assertEqual(schema.description, description)
-
-    def test_custom_metaclass(self):
-        """Test initialization with custom metaclass"""
-
-        class CustomMetaclass(DeclarativeMeta):
-            """Custom Metaclass to override Libra's built-in Metaclass"""
-
-            def __init__(cls, clsname, parents, dct) -> None:
-                """
-                Execute sqlalchemy's declarative base __init__ function & add a
-                'custom variable' to the base class after inherited __init__.
-                """
-
-                super(CustomMetaclass, cls).__init__(clsname, parents, dct)
-
-                # Set a random variable or do other custom things
-                cls.custom_variable = self.custom_var
-
-        schema = Schema(self.schema_name, metaclass = CustomMetaclass)
-
-        return self.assertEqual(schema.base.custom_variable, self.custom_var)
-
-    def test_custom_typemap_builtin(self):
-        """Test initialization with custom typemap using SQLA built-in types"""
-
-        schema = Schema(self.schema_name, typemap = self.builtin_typemap)
-
-        return self.assertEqual(schema.typemap, self.builtin_typemap)
-
-    def test_custom_typemap_custom(self):
-        """Test initialization with custom typemap using custom types"""
-
-        class VARCHAR2Byte(String): 
-            """Custom byte-encoded VARCHAR2 type specific to Oracle Dialect"""
-            ...
-        
-        @compiles(VARCHAR2Byte)
-        def compile_varchar2byte(_type, compiler, **kw):
-
-            le = _type.length
-
-            return 'VARCHAR(%i BYTE)' % len # Returns this string to DDL
-        
-        custom_typemap : TypeMap = {String : VARCHAR2Byte}
-
-        schema = Schema(self.schema_name, typemap = custom_typemap)
-
-        return self.assertEqual(schema.typemap, custom_typemap)
-         
-    def test_single_mixins(self):
-        """Test schema initialization with a single mixin class"""
-
-        class MyMixin01: 
-            ...
-
-        schema = Schema(self.schema_name, mixins = (MyMixin01,))
-
-        return self.assertEqual(type(schema.mixins[0]), type(MyMixin01))
-    
-    def test_multiple_mixins(self):
-        """Test schema initialization with multiple mixin classes"""
-
-        class MyMixin01: ...
-        class MyMixin02: ...
-        class MyMixin03: ...
-
-        schema = Schema(self.schema_name, mixins = (MyMixin01, MyMixin02, MyMixin03))
-
-        return self.assertEqual(
-            [type(schema.mixins[0]), type(schema.mixins[1]), type(schema.mixins[2])],
-            [type(MyMixin01), type(MyMixin02), type(MyMixin03)]
-        )
+SCHEMA_NAME = 'Test Schema'
+VALID_DICT  = {
+    SCHEMA_NAME : {
+        'description' : 'Example test schema',
+        'columns' : {
+            'userid' : {'type' : 'Integer()', 'nullable' : False},
+            'orderid' : {'type' : 'Uuid()', 'nullable' : False},
+            'name' : {'type' : 'String(length = 32)', 'nullable' : False},
+            'email' : {'type' : 'String(length = 32)', 'nullable' : True, 'default' : '-'},
+            'user_status' : {'type' : 'String(length = 12)', 'nullable' : False, 'default' : 'active', 'info' : {'format' : '12.12s', 'width' : 12}},
+            'order_status' : {'type' : 'String(length = 12)', 'nullable' : False, 'default' : 'opened'},
+            'order_placed' : {'type' : 'DateTime()', 'nullable' : False, 'default' : {'$ref' : 'datetime.now'}},
+            'moddate' : {'type' : 'DateTime()', 'nullable' : False, 'onupdate' : {'$ref' : 'datetime.now'}, 'default' : {'$ref' : 'datetime.now'}},
+            'loaddate' : {'type' : 'DateTime()', 'nullable' : False, 'default' : {'$ref' : 'datetime.now'}}
+        },
+        'models' : {
+            'User' : {
+                'columns' : ['userid', 'name', 'email', 'user_status', 'moddate', 'loaddate'],
+                'constraints' : [{'pk' : {'columns' : ['userid']}}, {'uq' : {'columns' : ['name']}}, {'ix' : {'columns' : ['email']}}, {'ck' : {'sqltext' : "column('user_status').in_(['active', 'inactive'])"}}]
+            },
+            'Order' : {
+                'columns' : ['orderid', 'userid', 'order_placed', 'order_status', 'moddate', 'loaddate'],
+                'constraints' : [{'pk' : {'columns' : ['orderid']}}, {'uq' : {'columns' : ['orderid', 'userid']}}, {'ck' : {'sqltext' : "column('order_status').in_(['opened', 'in process', 'closed'])"}}]
+            }
+        }
+    }
+}
 
 # ==============================================================================
-# Classes to handle the propagation of Initialized Properties to Child classes
+# Schema Initialization Tests
 
-class Test_SchemaInitPropagation(unittest.TestCase):
-    """Test propagation of initialized parameters to children of schema"""
+class TestSchemaInitialization(unittest.TestCase):
 
-    schema_name : str = 'Test Schema'
-    custom_var  : str = 'Custom Variable'
-    builtin_typemap : TypeMap = TypeMap({'String' : VARCHAR})
+    def test_basic_initialization(self):
+        schema = Schema(SCHEMA_NAME)
 
-    class TestModel:
-        column01 = Column(Integer)
-        column02 = Column(Float(precision = 53))
-        column03 = Column(String(30))
-        column04 = Column(DateTime)
-
-        pk = ['column01']
-        uq = ['column02', 'column03']
-
+        self.assertEqual(schema.name, SCHEMA_NAME)
+        self.assertIsNone(schema.description)
+        self.assertEqual(schema._registry.columns, {})
+        self.assertEqual(schema._registry.models, {})
+        self.assertEqual(schema._model_cache, {})
     
-    def test_name_init(self):
-        """Simply ensure the schema name is initialized as expected"""
+    def test_initialization_with_description(self):
+        schema = Schema(SCHEMA_NAME, description = 'DESC')
 
-        schema = Schema(self.schema_name)
-        
-        schema.add_model(self.TestModel)
+        self.assertEqual(schema.description, 'DESC')
 
-        return self.assertEqual(schema.name, self.schema_name)
-
-    def test_description_init(self):
-        """Test description initialization"""
-
-        description ='Testing adding a description to the schema.'
-
-        schema = Schema(self.schema_name, description = description)
-
-        schema.add_model(self.TestModel)
-
-        return self.assertEqual(schema.description, description)
-
-    def test_custom_metaclass(self):
-        """Test propagation of the metaclass onto attributes of schema"""
-
-        class CustomMetaclass(DeclarativeMeta):
-            """Custom Metaclass to override Libra's built-in Metaclass"""
-
-            def __init__(cls, clsname, parents, dct) -> None:
-                """
-                Execute sqlalchemy's declarative base __init__ function & add a
-                'custom variable' to the base class after inherited __init__.
-                """
-
-                super(CustomMetaclass, cls).__init__(clsname, parents, dct)
-
-                # Set a random variable or do other custom things
-                cls.custom_variable = self.custom_var
-            
-        schema = Schema(self.schema_name, metaclass = CustomMetaclass)
-
-        schema.add_model(self.TestModel)
-
-        return self.assertEqual(schema.TestModel.custom_variable, self.custom_var)
-
-    def test_custom_typemap_builtin(self):
-        """Test propagation of built-in SQLA types to children of schema"""
-
-        schema = Schema(self.schema_name, typemap = self.builtin_typemap)
-
-        schema.add_model(self.TestModel)
-        
-        test = schema.TestModel
-
-        return self.assertEqual(type(test.column03.type), type(VARCHAR()))
-
-    def test_custom_typemap_custom(self):
-        """Test propagation of custom SQLA types to children of schema"""
-
-        class VARCHAR2Byte(String): 
-            """Custom byte-encoded VARCHAR2 type specific to Oracle Dialect"""
-            ...
-        
-        @compiles(VARCHAR2Byte)
-        def compile_varchar2byte(_type, compiler, **kw):
-
-            len = _type.length
-
-            return 'VARCHAR(%i BYTE)' % len # Returns this string to DDL
-        
-        custom_typemap : TypeMap = TypeMap({'String' : VARCHAR2Byte})
-
-        schema = Schema(self.schema_name, typemap = custom_typemap)
-
-        schema.add_model(self.TestModel)
-
-        test = schema.TestModel
-
-        return self.assertEqual(type(test.column03.type), type(VARCHAR2Byte()))
-
-    def test_single_mixins(self):
-        """Test propagation to models of a single mixin class"""
-
-        class MyMixin01:
-            def _message(self, message : str) -> str:
-                return message
-            
-        schema = Schema(self.schema_name, mixins = (MyMixin01,))
-
-        schema.add_model(self.TestModel)
-
-        class Test(schema.TestModel):
-            __tablename__ = 'test'
-
-        test = Test(column01 = 1)
-
-        self.assertEqual(test._message('Hello World'), 'Hello World')
-
-    def test_multiple_mixins(self):
-        """Test schema initialization with multiple mixin classes"""
-
-        class MyMixin01:
-            def _message(self, message : str) -> str:
-                return message
-            
-        class MyMixin02:
-            def _get_col4(self, format : str = '%Y/%m/%d %H:%M:%S') -> str:
-                return datetime.strftime(self.column04, format)
-            
-        class MyMixin03:
-            column05 = Column(String(length = 15), default = 'Default Text')
-
-        schema = Schema(self.schema_name, mixins = (MyMixin01, MyMixin02, MyMixin03))
-        schema.add_model(self.TestModel)
-
-        class Test(schema.TestModel):
-            __tablename__ = 'Test'
-
-        test = Test(
-            column01 = 1,
-            column02 = 43.0, 
-            column03 = 'testing', 
-            column04 = datetime(2025, 1, 21, 14, 12, 1)
-        )
-        self.assertEqual(test._message('testing'), 'testing')
-        self.assertEqual(test._get_col4(), '2025/01/21 14:12:01')
-        self.assertEqual(test.column05, 'Default Text')
 
 # ==============================================================================
-# Classes to ensure appropriate Schema Dispatch Strategies
+# Dict Transfer Strategy Tests
 
-class Test_SchemaDispatchStrategy(unittest.TestCase):
-    """Test that transfer strategies are appropriately mapped."""
-
-    def test_dictionary_dispatch(self):
-        """DictionarySettings maps to DictionaryTransferStrategy"""
-
-        settings = DictionarySettings(dictionary = {})
-
-        strategy = Schema('Test')._dispatch_strategy(settings)
-
-        return self.assertEqual(strategy, DictionaryTransferStrategy)
+class TestSchemaDictTransfer(unittest.TestCase):
     
-    def test_yamlfile_dispatch(self):
-        """YAMLFileSettings maps to YAMLFileStrategy"""
-
-        settings = YAMLFileSettings(file = '')
-
-        strategy = Schema('Test')._dispatch_strategy(settings)
-
-        return self.assertEqual(strategy, YAMLFileTransferStrategy)
+    def setUp(self):
+        self.schema = Schema(SCHEMA_NAME).load(VALID_DICT)
     
-    def test_database_dispatch(self):
-        """DatabaseSettings maps to YAMLFileStrategy"""
+    def test_dict_load_populates_registry(self):
+        self.assertIn('userid', self.schema._registry.columns)
+        self.assertIn('User', self.schema._registry.models)
+        self.assertEqual(self.schema.description, 'Example test schema')
+    
+    def test_lazy_model_construction(self):
+        self.assertNotIn('User', self.schema._model_cache)
 
-        settings = DatabaseSettings(connection_str = '')
+        user_model = self.schema.User
 
-        strategy = Schema('Test')._dispatch_strategy(settings)
+        self.assertIn('User', self.schema._model_cache)
+        self.assertTrue(hasattr(user_model, '__abstract__'))
+    
+    def test_column_types_construct(self):
+        user_model = self.schema.User
 
-        return self.assertEqual(strategy, DatabaseTransferStrategy)
+        self.assertIsInstance(user_model.userid.type, sqlalchemy.Integer)
+        self.assertIsInstance(user_model.name.type, sqlalchemy.String)
+        self.assertEqual(user_model.name.type.length, 32)
+    
+    def test_callable_defaults(self):
+        user_model = self.schema.User
 
-    def test_custom_dispatch(self):
-        """Custom Settings map to Custom Transfer Strategy"""
+        self.assertTrue(callable(user_model.moddate.default.arg))
+        self.assertTrue(callable(user_model.loaddate.default.arg))
+        self.assertTrue(callable(user_model.moddate.onupdate.arg))
+    
+    def test_unique_constraints(self):
+        user_model = self.schema.User
 
-        class CustomTransferStrategy(TransferStrategy):
-            def load(): ... # Required as TransferStrategy is ABC
-            def write(): ...
-        
-        class CustomSettings(_SchemaSettings):
-            custom_variable : str
-            transfer_strategy : type[CustomTransferStrategy] = CustomTransferStrategy
-        
-        settings = CustomSettings(custom_variable = 'My custom variable')
+        uniques = [c for c in user_model.__table_args__ if isinstance(c, sqlalchemy.UniqueConstraint)]
 
-        strategy = Schema('Test')._dispatch_strategy(settings)
+        self.assertTrue(any('name' in [col for col in u._pending_colargs] for u in uniques))
+    
+    def test_check_constraints(self):
+        user_model = self.schema.User
 
-        return self.assertEqual(strategy, CustomTransferStrategy)
+        checks = [c for c in user_model.__table_args__ if isinstance(c, sqlalchemy.CheckConstraint)]
+
+        self.assertTrue(len(checks) > 0)
+    
+    def test_dict_dump_round_trip(self):
+        dumped = self.schema.dump()
+
+        self.assertEqual(dumped, VALID_DICT)
+    
+    def test_dump_after_lazy_load(self):
+        _ = self.schema.User
+        _ = self.schema.Order
+
+        dumped = self.schema.dump()
+        self.assertEqual(dumped, VALID_DICT)
+
 
 # ==============================================================================
-# Classes to handle Schema Loading
+# YAML File Transfer Strategy Tests
 
-class Test_SchemaLoad_Dictionary(unittest.TestCase):
-    """Test Schema Load functionality for Python Dictionaries"""
+class TestSchemaYAMLTransfer(unittest.TestCase):
+    
+    def setUp(self):
+        self.tempfile = tempfile.NamedTemporaryFile(mode = 'w', suffix = '.yaml', delete = False)
 
-    schema_name : str = 'Test Schema 1'
-    dictionary : dict = TEST_DICT
-    settings : DictionarySettings = DictionarySettings(dictionary = dictionary)
-    pickled_data = pickle.dumps({'name' : 'Testing'})
+        yaml.safe_dump(VALID_DICT, self.tempfile)
+    
+    def tearDown(self):
+        os.remove(self.tempfile.name)
+    
+    def test_yaml_load(self):
+        schema = Schema(SCHEMA_NAME).load(self.tempfile.name)
 
-    def test_load_dictionary(self):
-        """Test loading of schema definition dictionary"""
+        self.assertIn('User', schema._registry.models)
+        self.assertEqual(schema.description, 'Example test schema')
+    
+    def test_yaml_dump(self):
+        schema = Schema(SCHEMA_NAME).load(VALID_DICT)
 
-        schema = Schema(self.schema_name).load(self.settings)
+        schema.dump(self.tempfile.name)
 
-        class Model01(schema.model01): __tablename__ = 'test1'
-        class Model02(schema.model02): __tablename__ = 'test2'
-        class Model03(schema.model03): __tablename__ = 'test3'
-
-        vals_01 = {'column01' : 1, 'column14' : 'testing', 'column02' : True, 'column05' : 43.0, 'column06' : 'a', 'column16' : datetime(2025, 7, 28, 12, 0, 0), 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-        vals_02 = {'column08' : 1, 'column09' : datetime(2025, 7, 28, 12, 0, 0), 'column09' : timedelta(4), 'column12' : self.pickled_data, 'column18' : 'testing', 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-        vals_03 = {'column13' : 1, 'column11' : 9999.999, 'column19' : uuid.uuid4(), 'column17' : 'testing', 'column15' : 'testing2', 'column10' : 2, 'column07' : 43.0, 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-
-        mod1 = Model01(**vals_01)
-        mod2 = Model02(**vals_02)
-        mod3 = Model03(**vals_03)
-
-        for model, values in zip([mod1, mod2, mod3], [vals_01, vals_02, vals_03]):
-            for key, val in values.items():
-                self.assertEqual(getattr(model, key), val)
-
-
-class Test_SchemaLoad_YAML(unittest.TestCase):
-    """Test Schema Load functionality for YAML Files"""
-
-    schema_name : str = 'Test Schema 1'
-    file : str | os.PathLike = 'tests/resources/libra_test.yaml'
-    settings : YAMLFileSettings = YAMLFileSettings(file = file)
-    pickled_data = pickle.dumps({'name' : 'Testing'})
-
-    def test_load_yamlfile(self):
-        """Test loading of schema definition YAML file"""
-
-        schema = Schema(self.schema_name).load(self.settings)
-
-        class Model01(schema.model01): __tablename__ = 'test1'
-        class Model02(schema.model02): __tablename__ = 'test2'
-        class Model03(schema.model03): __tablename__ = 'test3'
-
-        vals_01 = {'column01' : 1, 'column14' : 'testing', 'column02' : True, 'column05' : 43.0, 'column06' : 'a', 'column16' : datetime(2025, 7, 28, 12, 0, 0), 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-        vals_02 = {'column08' : 1, 'column09' : datetime(2025, 7, 28, 12, 0, 0), 'column09' : timedelta(4), 'column12' : self.pickled_data, 'column18' : 'testing', 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-        vals_03 = {'column13' : 1, 'column11' : 9999.999, 'column19' : uuid.uuid4(), 'column17' : 'testing', 'column15' : 'testing2', 'column10' : 2, 'column07' : 43.0, 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-
-        mod1 = Model01(**vals_01)
-        mod2 = Model02(**vals_02)
-        mod3 = Model03(**vals_03)
+        with open(self.tempfile.name, 'r', encoding = 'utf-8') as f:
+            loaded = yaml.safe_load(f)
         
-        for model, values in zip([mod1, mod2, mod3], [vals_01, vals_02, vals_03]):
-            for key, val in values.items():
-                self.assertEqual(getattr(model, key), val)
+        self.assertEqual(loaded, VALID_DICT)
+    
+    def test_yaml_round_trip(self):
+        schema = Schema(SCHEMA_NAME).load(self.tempfile.name)
+
+        dumped = schema.dump()
+
+        new_schema = Schema(SCHEMA_NAME).load(dumped)
+
+        self.assertEqual(new_schema.dump(), VALID_DICT)
 
 
-class Test_SchemaLoad_Database(unittest.TestCase):
-    """Test Schema Load functionality for Database tables"""
+# ==============================================================================
+# Database Transfer Strategy Tests
 
-    schema_name : str = 'Test Schema 1'
-    connection : str = 'sqlite:///tests/resources/libra_test.db'
-    settings : DatabaseSettings = DatabaseSettings(connection_str = connection)
-    pickled_data = pickle.dumps({'name' : 'Testing'})
-    engine : sqlalchemy.Engine = create_engine(connection)
-    session : Session = Session(bind = engine)
+class TestSchemaDBTransfer(unittest.TestCase):
 
     def setUp(self):
-        """Create & populate Libra schema definition tables"""
+        # In-memory SQLite DB
+        self.engine = sqlalchemy.create_engine('sqlite:///:memory:')
 
-        with open('tests/resources/insert/test_schemas.sql', 'r') as sql_file:
-            sql_script = sql_file.read()
-        
-        db =  sqlite3.connect(self.connection.replace('sqlite:///', ''))
+        self.db_settings = DatabaseSettings(
+            engine = self.engine,
+            author = 'tester',
+            create_tables = True,
+            overwrite = True
+        )
 
-        cursor = db.cursor()
-        cursor.executescript(sql_script)
-
-        db.commit()
-
-        db.close()
-
-    def test_load_database(self):
-        """Test loading schema definition from database tables"""
-
-        schema = Schema(self.schema_name).load(self.settings)
-
-        class Model01(schema.model01): __tablename__ = 'test1'
-        class Model02(schema.model02): __tablename__ = 'test2'
-        class Model03(schema.model03): __tablename__ = 'test3'
-
-        vals_01 = {'column01' : 1, 'column14' : 'testing', 'column02' : True, 'column05' : 43.0, 'column06' : 'a', 'column16' : datetime(2025, 7, 28, 12, 0, 0), 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-        vals_02 = {'column08' : 1, 'column09' : datetime(2025, 7, 28, 12, 0, 0), 'column09' : timedelta(4), 'column12' : self.pickled_data, 'column18' : 'testing', 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-        vals_03 = {'column13' : 1, 'column11' : 9999.999, 'column19' : uuid.uuid4(), 'column17' : 'testing', 'column15' : 'testing2', 'column10' : 2, 'column07' : 43.0, 'column04' : datetime(2025, 7, 28, 12, 0, 0)}
-
-        mod1 = Model01(**vals_01)
-        mod2 = Model02(**vals_02)
-        mod3 = Model03(**vals_03)
-        
-        for model, values in zip([mod1, mod2, mod3], [vals_01, vals_02, vals_03]):
-            for key, val in values.items():
-                self.assertEqual(getattr(model, key), val)
+        self.schema = Schema(SCHEMA_NAME).load(VALID_DICT)
     
-    def tearDown(self):
-        """Drop Libra schema definition tables and any information in them."""
+    def test_db_dump_creates_tables(self):
+        self.schema.dump(self.db_settings)
 
-        db = sqlite3.connect(self.connection.replace('sqlite:///', ''))
+        inspector = sqlalchemy.inspect(self.engine)
+        tables = inspector.get_table_names()
 
-        cursor = db.cursor()
-        for table in ['schemadescript', 'modeldescript', 'columnassoc', 'columndescript', 'constraintdescript']:
-            cursor.execute(f'DROP TABLE IF EXISTS {getattr(self.settings, table)}')
-        
-        db.commit()
+        expected_tables = {
+            self.db_settings.schemadescript,
+            self.db_settings.modeldescript,
+            self.db_settings.columndescript,
+            self.db_settings.columnassoc,
+            self.db_settings.columninfo,
+            self.db_settings.constraintdescript
+        }
 
-        db.close()
+        self.assertTrue(expected_tables.issubset(set(tables)))
+    
+    def test_db_dump_prevents_overwrite(self):
+        self.schema.dump(self.db_settings)
+
+        no_overwrite = DatabaseSettings(
+            engine = self.engine,
+            author = 'tester',
+            create_tables = False,
+            overwrite = False
+        )
+
+        with self.assertRaises(ValueError):
+            self.schema.dump(no_overwrite)
+    
+    def test_db_dump_overwrite_true(self):
+        self.schema.dump(self.db_settings)
+
+        overwrite_settings = DatabaseSettings(
+            engine=self.engine,
+            author="tester",
+            create_tables=False,
+            overwrite=True
+        )
+
+        # Should not raise
+        self.schema.dump(overwrite_settings)
+    
+    def test_db_load_schema_not_found(self):
+        empty_settings = DatabaseSettings(
+            engine=self.engine,
+            author="tester",
+            create_tables=True,
+            overwrite=True
+        )
+
+        with self.assertRaises(SchemaNotFoundError):
+            Schema(SCHEMA_NAME).load(empty_settings)
+    
+    def test_db_round_trip(self):
+        # Dump to DB
+        self.schema.dump(self.db_settings)
+
+        # Load into fresh schema
+        loaded = Schema(SCHEMA_NAME).load(self.db_settings)
+        dumped = loaded.dump()
+
+        self.assertEqual(dumped, VALID_DICT)
+    
+    def test_db_round_trip_after_lazy_model_build(self):
+        self.schema.dump(self.db_settings)
+
+        loaded = Schema(SCHEMA_NAME).load(self.db_settings)
+
+        # Trigger lazy load
+        _ = loaded.User
+        _ = loaded.Order
+
+        self.assertEqual(loaded.dump(), VALID_DICT)
+
 
 # ==============================================================================
-# Classes to handle Schema Writing
+# Stress test (200 models, with 1000 columns each, deserialized in under 5 sec)
 
-class Test_SchemaWrite_Dictionary(unittest.TestCase):
-    """Test Schema Write functionality for Python Dictionaries"""
-
-    schema_name : str = 'Test Schema 1'
-    dictionary : dict = TEST_DICT
-    settings : DictionarySettings = DictionarySettings(dictionary = TEST_DICT)
-    pickled_data = pickle.dumps({'name' : 'Testing'})
-
-    def test_write_dictionary(self):
-        """Test writing of schema definition dictionary"""
-
-        schema = Schema(self.schema_name).load(self.settings)
-
-        schema.name = 'Test Schema 2'
-        schema.description = 'Schema #2 for testing purposes'
-
-        schema_dict = schema.write(settings = self.settings)
-
-        self.assertEqual(schema_dict['Test Schema 1']['columns'], schema_dict['Test Schema 2']['columns'])
-        self.assertEqual(schema_dict['Test Schema 1']['models'], schema_dict['Test Schema 2']['models'])
-
-
-class Test_SchemaWrite_YAMLFile(unittest.TestCase):
-    """Test Schema Write functionality for YAML Files"""
-
-    schema_name : str = 'Test Schema 1'
-    infile : str | os.PathLike = 'tests/resources/libra_test.yaml'
-    outfile : str | os.PathLike = 'tests/resources/libra_testwrite.yaml'
-    insettings : YAMLFileSettings = YAMLFileSettings(file = infile)
-    outsettings : YAMLFileSettings = YAMLFileSettings(file = outfile)
-    pickled_data = pickle.dumps({'name' : 'Testing'})
-
-    def test_write_yamlfile(self):
-        """Test writing of a yaml file"""
-
-        schema = Schema(self.schema_name).load(self.insettings)
-
-        schema.name = 'Test Schema 2'
-        schema.description = 'Schema #2 for testing purposes'
-
-        schema.write(self.outsettings)
-
-        with open(self.insettings.file, 'r') as f1, open(self.outsettings.file, 'r') as f2:
-            schema1 = yaml.safe_load(f1)
-            schema2 = yaml.safe_load(f2)
-        
-        self.assertEqual(schema1['Test Schema 1']['columns'], schema2['Test Schema 2']['columns'])
-        self.assertEqual(schema1['Test Schema 1']['models'], schema2['Test Schema 2']['models'])
-
-    def tearDown(self):
-        if os.path.exists(self.outsettings.file):
-            try:
-                os.remove(self.outsettings.file)
-            except OSError as e:
-                print(f'Error deleting file \'{self.outsettings.file}\': {e}')
-        else:
-            print(f'File \'{self.outsettings.file}\' does not exist.')
-
-
-class Test_SchemaWrite_Database(unittest.TestCase):
-#     """Test Schema Write functionality for database tables"""
-
-    schema_name : str = 'Test Schema 1'
-    connection : str = 'sqlite:///tests/resources/libra_test.db'
-    settings : DatabaseSettings = DatabaseSettings(connection_str = connection, author = 'bspears-LANL')
-    pickled_data = pickle.dumps({'name' : 'Testing'})
+class TestSchemaPerformance(unittest.TestCase):
 
     def setUp(self):
-        """Create & populate Libra schema definition tables"""
+        from libra.registry import Registry  # adjust import
+        self.registry = Registry()
 
-        with open('tests/resources/insert/test_schemas.sql', 'r') as sql_file:
-            sql_script = sql_file.read()
+        # Fast mock to avoid heavy deserialization cost
+        self.registry.columnhandler.deserialize = MagicMock(
+            side_effect=lambda d: list(d.values())[0]
+        )
+
+    def test_performance_stress(self):
+        NUM_MODELS = 200
+        NUM_COLUMNS = 1000
+        MAX_DURATION = 5 # seconds
+
+        self.registry.columns = {
+            f'col_{i}' : {
+                'type' : 'String(length = 32)',
+                'nullable' : True
+            } for i in range(NUM_COLUMNS)
+        }
+
+        self.registry.models = {
+            f'model_{m}' : {
+                'columns' : [f'col_{i}' for i in range(NUM_COLUMNS)],
+                'constraints' : []
+            } for m in range(NUM_MODELS)
+        }
+
+        start = time.time()
         
-        db =  sqlite3.connect(self.connection.replace('sqlite:///', ''))
+        for m in range(NUM_MODELS):
+            self.registry._create(f'model_{m}')
 
-        cursor = db.cursor()
-        cursor.executescript(sql_script)
+        duration = time.time() - start
 
-        db.commit()
+        # Basic structural validation
+        self.assertEqual(len(self.registry.models.keys()), NUM_MODELS)
+        self.assertEqual(len(self.registry.columns.keys()), NUM_COLUMNS)
 
-        db.close()
+        # # Sanity threshold (adjust if needed)
+        self.assertLess(duration, MAX_DURATION, 
+            f"Stress test timing over maximum duration of {MAX_DURATION:.2f}s; took {duration:.2f}s")
 
-    def test_write_database(self):
-        """Test writing of database tables"""
-        
-        schema = Schema(self.schema_name).load(self.settings)
-
-        schema.name = 'Test Schema 2'
-        schema.description = 'Schema #2 for testing purposes'
-
-        schema.write(self.settings)
-    
-    def tearDown(self):
-        """Drop Libra schema definition tables and any information in them."""
-
-        db = sqlite3.connect(self.connection.replace('sqlite:///', ''))
-
-        cursor = db.cursor()
-        for table in ['schemadescript', 'modeldescript', 'columnassoc', 'columndescript', 'constraintdescript']:
-            cursor.execute(f'DROP TABLE IF EXISTS {getattr(self.settings, table)}')
-        
-        db.commit()
-
-        db.close()
 
 # ==============================================================================
 

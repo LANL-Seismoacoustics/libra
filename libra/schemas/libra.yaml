@@ -1,176 +1,149 @@
 Libra :
-  description : "Self-describing schema for the construction of SQLAlchemy Object-relation-mapped (ORM) instances using the Libra Python package."
+  description : Self-describing schema to be used in conjunction with the Python-based schema serialization library, Libra.
   columns :
-    autoincrement :
-      sa_coltype : String(30)
-      nullable : False
-      description : "Indicates the column should be autoincremented according to SQLAlchemy's autoincrement feature. Acceptable values are 'auto', 'True', 'False', & 'ignore_fk'"
-    columns : 
-      sa_coltype : String(1024)
-      nullable : False
-      description : "List of unique column names formatted as '['column1','column2',...]' to be passed to an SQLAlchemy PrimaryKeyConstraint or UniqueConstraint object."
-    column_alias :
-      sa_coltype : String(128)
-      nullable : False
-      description : "Alias of the associated column. Should be used in the event that the column's name coincides with a Python built-in. (e.g. 'yield'; in this case, column_name should be '_yield' and column alias should be 'yield'))"
-    column_name : 
-      sa_coltype : String(128)
-      nullable : False
-      description : "Name of the associated column."
+    column_name :
+      type : String(length = 30)
+      nullable : True
+      default : '-'
+      info :
+        format : 30.30s
+        width : 30
     column_position :
-      sa_coltype : Integer
+      type : Numeric(8)
       nullable : False
-      description : "Position of the column in the associated model as an integer, starting from 0."
-    constraint_name :
-      sa_coltype : String(128)
-      nullable : False
-      description : "Name of the associated constraint. This name is used internally for indexing in Libra and will not be passed to the DDL."
+      info :
+        format : i8
+        width : 8
     constraint_type :
-      sa_coltype : String(2)
+      type : String(length = 2)
       nullable : False
-      description : "Type of the associated constraint belonging to the set ('pk' & 'uq')."
-    default :
-      sa_coltype : String(1024)
-      nullable : False
-      description : "Value passed to the SQLAlchemy Column object's __init__ method as the 'default' parameter. A model will then substitute this value for any column that is passed a Python NoneType value."
-    deferrable :
-      sa_coltype : Integer
-      nullable : False
-      description : "Boolean value to indicate if a constraint is deferrable. '0' maps to False, '1' maps to True."
+      info :
+        format : 2.2s
+        width : 2
+    _default :
+      type : String(length = 64)
+      nullable : True
+      default : '-'
+      info :
+        format : 64.64s
+        width : 64
     description :
-      sa_coltype : String(1024)
+      type : String(length = 1024)
+      nullable : True
+      default : '-'
+      info :
+        format : 1024.1024s
+        width : 1024
+    key_name :
+      type : String(length = 64)
       nullable : False
-      description : "Description of the associated object."
-    info :
-      sa_coltype : String(1024)
+      info :
+        format : 64.64s
+        width : 64
+    key_type :
+      type : String(length = 32)
       nullable : False
-      description : "Dictionary containing additional or custom key-value pairs to pass to an SQLAlchemy object's initialization method. (e.g. '{'format' : 128.128s'}')"
-    initially : 
-      sa_coltype : String(30)
-      nullable : False
-      description : "Indicates when a constraint's validation happens. Belongs to the set ('IMMEDIATE', 'DEFERRED')."
+      info :
+        format : 32.32s
+        width : 32
+    key_value :
+      type : String(length = 128)
+      nullable : True
+      default : '-'
+      info : 
+        format : 128.128s
+        width : 128
     loadauthor :
-      sa_coltype : String(128)
-      nullable : False
-      description : "Original author of the associated object."
+      type : String(length = 32)
+      nullable : True
+      default : '-'
+      info : 
+        format : 32.32s
+        width : 32
     loaddate :
-      sa_coltype : DateTime()
+      type : DateTime()
       nullable : False
-      description : "Date and time of creation of the associated object."
-      default : datetime.now(timezone.utc)
+      default : {'$ref' : 'datetime.now'}
+      info :
+        format : '%Y-%m-%d %H:%M:%S'
+        width : 19
     modauthor :
-      sa_coltype : String(128)
-      nullable : False
-      description : "Author to last modify the associated object."
+      type : String(length = 32)
+      nullable : True
+      default : '-'
+      info : 
+        format : 32.32s
+        width : 32
     moddate :
-      sa_coltype : DateTime()
+      type : DateTime()
       nullable : False
-      description : "Date and time of the last modification of the associated object."
-      default : datetime.now(timezone.utc)
-    model_name : 
-      sa_coltype : String(128)
+      default : {'$ref' : 'datetime.now'}
+      onupdate : {'$ref' : 'datetime.now'}
+      info :
+        format : '%Y-%m-%d %H:%M:%S'
+        width : 19
+    model_name :
+      type : String(length = 30)
       nullable : False
-      description : "Name of the associated model."
+      info :
+        format : 30.30s
+        width : 30
     nullable :
-      sa_coltype : Integer
+      type : String(length = 1)
       nullable : False
-      description : "Boolean value to indicate if a column is nullable. '0' maps to False, '1' maps to True."
-    ondelete :
-      sa_coltype : String(128)
-      nullable : False
-      description : "Defines behavior of the referenced columns in a Foreign Key Constraint when a row in the parent table is deleted."
+      default : 'y'
+      info :
+        format : 1.1s
+        width : 1
     onupdate :
-      sa_coltype : String(128)
+      type : String(length = 64)
+      nullable : True
+      default : '-'
+      info :
+        format : 64.64s
+        width : 64
+    schema_name : 
+      type : String(length = 30)
       nullable : False
-      description : "Passed to the initialization method of the SQLAlchemy ORM object, forcing the object to automatically pass this value to the DDL when the SQLAlchemy ORM object is updated."
-    quote :
-      sa_coltype : String(128)
-      nullable : False
-      description : "SQLAlchemy type object with necessary arguments or keyword arguments. (e.g. 'String(128)' or 'Float(precision = 53)')"
-    reference : 
-      sa_coltype : String(128)
-      nullable : False
-      description : "Model and column name that is referenced by a Foreign Key Constraint. e.g. 'columndescript.column_name'."
-    sa_coltype :
-      sa_coltype : String(128)
-      nullable : False
-      description : "SQLAlchemy type object with necessary arguments or keyword arguments. (e.g. 'String(128)' or 'Float(precision = 53)')"
-    schema_name :
-      sa_coltype : String(128)
-      nullable : False
-      description : "Name of the associated schema."
+      info : 
+        format : 30.30s
+        width : 30
     sqltext :
-      sa_coltype : String(1024)
+      type : String(length = 1024)
+      nullable : True
+      default : '-'
+      info :
+        format : 1024.1024s
+        width : 1024
+    type :
+      type : String(length = 64)
       nullable : False
-      description : "SQL to pass to the DDL when evaluating a Check Constraint."
+      info :
+        format : 64.64s
+        width : 64
   models :
     schemadescript :
-      description : "Model that describes a particular schema. The schema name is used as a foreign key across Libra's self-describing schema base."
-      columns : 
-        - schema_name
-        - description
-        - modauthor
-        - loadauthor
-        - moddate
-        - loaddate
-      constraints :
-        - pk : [schema_name]
-    modeldescript :
-      description : "Model that describes a model belonging to a particular schema. The model name is used as a foreign key across Libra's self-describing schema base."
-      columns :
-        - model_name
-        - description
-        - schema_name
-        - modauthor
-        - loadauthor
-        - moddate
-        - loaddate
-      constraints :
-        - pk : [model_name, schema_name]
-    columndescript :
-      description : "Model that describes a column belonging to a particular model. The column name and schema name are used as foreign keys across Libra's self-describing schema base."
-      columns :
-        - column_name
-        - column_alias
-        - sa_coltype
-        - default
-        - description
-        - schema_name
-        - modauthor
-        - loadauthor
-        - moddate
-        - loaddate
-      constraints :
-        - pk : [column_name, schema_name]
-    columnassoc :
-      description : "Model that associates a column described in columndescript with a model in modeldescript."
-      columns : 
-        - model_name
-        - column_name
-        - column_position
-        - nullable
-        - autoincrement
-        - quote
-        - onupdate
-        - schema_name
-        - info
-        - modauthor
-        - loadauthor
-        - moddate
-        - loaddate
-      constraints :
-        - pk : [column_name, model_name, schema_name]
-    constraintdescript : 
-      description : "Model that describes a constraint belonging to a model. Constraint name, model name, and schema name are used as foreign keys accros Libra's self-describing schema base."
-      columns : 
-        - constraint_type
-        - columns
-        - model_name
-        - schema_name
-        - modauthor
-        - loadauthor
-        - moddate
-        - loaddate
+      columns : [schema_name, description, modauthor, loadauthor, moddate, loaddate]
       constraints : 
-        - pk : [constraint_type, model_name, schema_name]
-      
+        - pk : {columns : [schema_name]}
+    modeldescript :
+      columns : [model_name, description, schema_name, modauthor, loadauthor, moddate, loaddate]
+      constraints :
+        - pk : {columns : [model_name, schema_name]}
+    columnassoc :
+      columns : [column_name, model_name, column_position, schema_name, modauthor, loadauthor, moddate, loaddate]
+      constraints :
+        - pk : {columns : [column_name, model_name, schema_name]}
+    columndescript :
+      columns : [column_name, type, nullable, _default, onupdate, schema_name, modauthor, loadauthor, moddate, loaddate]
+      constraints :
+        - pk : {columns : [column_name, schema_name]}
+        - ck : {sqltext : "column('nullable').in_(['y', 'n'])"}
+    columninfo :
+      columns : [column_name, schema_name, key_name, key_type, key_value, modauthor, loadauthor, moddate, loaddate]
+      constraints :
+        - pk : {columns : [column_name, schema_name, key_name]}
+    constraintdescript :
+      columns : [constraint_type, column_name, sqltext, model_name, schema_name, modauthor, loadauthor, moddate, loaddate]
+      constraints : 
+        - pk : {columns : [constraint_type, column_name, sqltext, model_name, schema_name]}

@@ -1,59 +1,153 @@
 """
-Brady Spears
-7/17/25
+Brady Spears, Los Alamos National Laboratory
+10/7/2025
 
-Contains the various children of `SchemaSettings`. Each child of 
-`SchemaSettings` maps to one of the three built-in load/write strategies 
-(`DictionaryTransferStrategy`, `YAMLFileTransferStrategy`, & 
-`DatabaseTransferStrategy`). Each transfer strategy requires different input 
-variables, and those differences are communicated via the appropriate 
-`SchemaSettings` polymorphism. Inheriting from Pydantic's `BaseSettings` 
-object, additional functionality is also provided for reading these settings in 
-from environment files rather than defining them in-line.
+Contains various `Settings` objects which encode complex runtime configuration
+variables for loading/dumping serialized schema definitions. 
 """
 
 # ==============================================================================
 
-from __future__ import annotations
-import os
+from typing import TypeVar
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import DeclarativeBase
+
+from dataclasses import dataclass
 
 # ==============================================================================
 
-class _SchemaSettings(BaseSettings):
-    """Parent class with common settings variables across all children"""
+Schema = TypeVar('Schema')
 
-    model_config = SettingsConfigDict(env_prefix = 'libra')
+# ==============================================================================
 
+@dataclass
+class DatabaseSettings:
+    """
+    Database Settings object to specify various database-specific parameters, 
+    like table names and database connections.
 
-class DictionarySettings(_SchemaSettings):
-    """Settings variables specific to DictionaryTransferStrategy"""
+    Attributes
+    ----------
+    engine : Engine
+        SQLAlchemy Engine object, used to establish a connection to a database.
+    schemadescript : str, Optional
+        Tablename of the 'schemadescript' table. Default is 'schemadescript'
+    modeldescript : str, Optional
+        Tablename of the 'modeldescript' table. Default is 'modeldescript'
+    columndescript : str, Optional
+        Tablename of the 'columndescript' table. Default is 'columndescript'
+    columnassoc : str, Optional
+        Tablename of the 'columnassoc' table. Default is 'columnassoc'
+    columninfo : str, Optional
+        Tablename of the 'columninfo' table. Default is 'columninfo'
+    glossary : str, Optional
+        Tablename of the 'glossary' table. Default is 'glossary'
+    create_tables : bool, Optional
+        Flag to optionally create teables if they don't already exist. Default 
+        is False.
+    overwrite : bool, Optional
+        Flag to overwrite schema definitions if they already exist. Default is 
+        False.
+    """
 
-    dictionary : dict[str, dict | str] | None = None
-
-
-class YAMLFileSettings(_SchemaSettings):
-    """Settings variables specific to YAMLFileTransferStrategy"""
-
-    file : str | os.PathLike | None = None
-
-
-class DatabaseSettings(_SchemaSettings):
-    """Settings variables specific to DatabaseTransferStrategy"""
-
-    # Database connection string (e.g. 'oracle://scott:tiger@my.url.com:1500/mydb')
-    connection_str : str | None = None
-
-    # Table owner or "schema" ('othernamespace.tablename')
-    namespace : str | None = None
-
-    # Tablenames for Libra's self-describing schema
+    engine             : Engine
     schemadescript     : str = 'schemadescript'
     modeldescript      : str = 'modeldescript'
-    columnassoc        : str = 'columnassoc'
     columndescript     : str = 'columndescript'
+    columnassoc        : str = 'columnassoc'
     constraintdescript : str = 'constraintdescript'
+    columninfo         : str = 'columninfo'
+    glossary           : str = 'glossary'
 
-    # Optional Author Field
-    author : str | None = None
+    author             : str | None = None
+    create_tables      : str = False
+    overwrite          : str = False
+
+    def _generate(self, schema : Schema) -> tuple[type[DeclarativeBase]]:
+
+        class Schemadescript(schema.schemadescript):
+            __tablename__ = self.schemadescript
+        
+        class Modeldescript(schema.modeldescript):
+            __tablename__ = self.modeldescript
+        
+        class Columndescript(schema.columndescript):
+            __tablename__ = self.columndescript
+        
+        class Columnassoc(schema.columnassoc):
+            __tablename__ = self.columnassoc
+        
+        class Columninfo(schema.columninfo):
+            __tablename__ = self.columninfo
+        
+        class Constraintdescript(schema.constraintdescript):
+            __tablename__ = self.constraintdescript
+        
+        return (
+            Schemadescript,
+            Modeldescript,
+            Columnassoc,
+            Columndescript,
+            Columninfo,
+            Constraintdescript
+        )
+
+@dataclass
+class SchemaSchemaSettings:
+    """
+    Database Settings object to support parameters pertinent to the legacy 
+    schema-schema relational database schema encoding format.
+
+    Attributes
+    ----------
+    engine : Engine
+        QLAlchemy Engine object, used to establish a connection to a database.
+        NOTE: The schema-schema only supports Oracle backends.
+    tabdescript : str, Optional
+        Tablename of the 'tabdescript' table. Default is 'doc.tabdescript'
+    coldescript : str, Optional
+        Tablename of the 'coldescript' table. Default is 'doc.coldescript'
+    colassoc : str, Optional
+        Tablename of the 'colassoc' table. Default is 'doc.coldescript'
+    complexjoin : str, Optional
+        Tablename of the 'complexjoin' table. Default is 'doc.complexjoin'
+    glossary : str, Optional
+        Tablename of the 'glossary' table. Default is 'doc.glossary'
+    create_tables : bool, Optional
+        Create schema-schema tables on dump. Default is False
+    """
+
+    engine      : Engine
+    tabdescript : str = 'doc.tabdescript'
+    coldescript : str = 'doc.coldescript'
+    colassoc    : str = 'doc.colassoc'
+    complexjoin : str = 'doc.complexjoin'
+    glossary    : str = 'doc.glossary'
+
+    create_tables : bool = False
+
+    def _generate(self, schema : Schema) -> tuple[type[DeclarativeBase]]:
+        
+        class Tabdescript(schema.tabdescript):
+            __tablename__ = self.tabdescript
+
+        class Coldescript(schema.coldescript):
+            __tablename__ = self.coldescript
+
+        class Colassoc(schema.colassoc):
+            __tablename__ = self.colassoc
+        
+        class Complexjoin(schema.complexjoin):
+            __tablename__ = self.complexjoin
+        
+        class Glossary(schema.glossary):
+            __tablename__ = self.glossary
+        
+        return (
+            Tabdescript,
+            Coldescript,
+            Colassoc,
+            Complexjoin,
+            Glossary
+        )
