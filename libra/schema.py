@@ -39,9 +39,7 @@ from sqlalchemy.orm import (
 )
 
 from .ext import (
-    FlatFileMixin,
-    PandasMixin,
-    QCMixin
+    FlatFileMixin
 )
 from .metaclass import LibraMetaClass
 from .registry import Registry, _UnbasedClass
@@ -135,7 +133,7 @@ class Schema:
         self._registry = Registry(typemap)
 
         # Assign Mixins if they exist
-        self.mixins = tuple(mixins) if mixins else (FlatFileMixin, PandasMixin, QCMixin, )
+        self.mixins = tuple(mixins) if mixins else (FlatFileMixin, )
 
         # Initialize SQLAlchemy Declarative Base
         self.base : DeclarativeBase = declarative_base(metaclass = metaclass)
